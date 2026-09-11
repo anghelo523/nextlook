@@ -1,0 +1,25 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  # Descubre automaticamente los microservicios registrados en Eureka (no hace falta
+  # listarlos a mano: apenas un microservicio se registra, Prometheus lo empieza a scrapear).
+  - job_name: "nextlook-microservicios"
+    eureka_sd_configs:
+      - server: "http://nextlook-eureka:18761/eureka"
+    metrics_path: "/actuator/prometheus"
+    relabel_configs:
+      - source_labels: [__meta_eureka_app_name]
+        target_label: application
+
+  # Config Server, Eureka y Gateway no se registran a si mismos en Eureka, asi que se
+  # scrapean por direccion fija (nombre del contenedor en la red de Docker).
+  - job_name: "nextlook-infra"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets:
+          - "nextlook-config:18888"
+          - "nextlook-eureka:18761"
+          - "nextlook-gateway:18080"
+        labels:
+          application: infra
