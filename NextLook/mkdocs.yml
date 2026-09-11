@@ -1,0 +1,57 @@
+site_name: NextLook
+site_description: E-commerce de moda basado en microservicios
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Cambiar a modo oscuro
+    - scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Cambiar a modo claro
+  features:
+    - navigation.tabs
+    - navigation.top
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Inicio: index.md
+  - Estado de avance: avance.md
+  - Brief técnico: brief.md
+  - Arquitectura: arquitectura.md
+  - Microservicios:
+      - cliente-ms: microservicios/cliente-ms.md
+      - catalogo-ms: microservicios/catalogo-ms.md
+      - inventario-ms: microservicios/inventario-ms.md
+      - resenas-ms: microservicios/resenas-ms.md
+      - orden-ms: microservicios/orden-ms.md
+      - pago-ms: microservicios/pago-ms.md
+      - envio-ms: microservicios/envio-ms.md
+      - notificaciones-ms: microservicios/notificaciones-ms.md
+  - Seguridad: seguridad.md
+  - Comunicación entre servicios: comunicacion.md
+  - Integración de pago: integracion-pago.md
+  - Flujo end-to-end: flujo-end-to-end.md
+  - Consistencia de datos: consistencia.md
+  - Notificaciones: notificaciones.md
+  - Alcance: alcance.md
+  - Producto:
+      - U1: u1-producto.md
+      - U2: u2-producto.md
+      - U3: u3-producto.md

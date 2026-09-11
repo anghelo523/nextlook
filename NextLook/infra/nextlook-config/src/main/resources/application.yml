@@ -1,0 +1,27 @@
+server:
+  port: 18888
+
+spring:
+  application:
+    name: nextlook-config
+  profiles:
+    active: native
+  cloud:
+    config:
+      server:
+        native:
+          # Config compartida en infra/config-repo (application.yml), config propia de
+          # eureka/gateway en infra/nextlook-*/config, y config de cada microservicio en
+          # services/{application}/config (Spring sustituye {application} por spring.application.name
+          # del cliente que pide la config, ej. catalogo-ms -> services/catalogo-ms/config).
+          # En Docker, CONFIG_SEARCH_LOCATIONS sobreescribe esta lista completa (ver Dockerfile/compose).
+          search-locations: ${CONFIG_SEARCH_LOCATIONS:file:../config-repo,file:../nextlook-eureka/config,file:../nextlook-gateway/config,file:../../services/{application}/config}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
