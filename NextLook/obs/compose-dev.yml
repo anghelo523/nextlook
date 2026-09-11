@@ -1,0 +1,23 @@
+# Observabilidad de DESARROLLO de NextLook. Se combina con la infraestructura y los
+# microservicios ya arriba (usa la misma red nextlook-dev-net), por eso se corre junto
+# con los otros compose, no solo, y SIEMPRE con docker-compose.infra.yml como PRIMER -f
+# (Compose resuelve las rutas relativas de todos los archivos contra la carpeta del primer
+# -f, por eso el volume de abajo es relativo a docker/, no a este archivo):
+#   docker compose -f docker/docker-compose.infra.yml -f services/compose-dev.yml -f obs/compose-dev.yml up -d --build
+#
+# Grafana y Promtail/Loki quedan pendientes (ver README de cada carpeta); por ahora solo
+# se levanta Prometheus, que ya descubre y scrapea todos los microservicios via Eureka.
+name: nextlook-obs-dev
+
+services:
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    container_name: nextlook-prometheus
+    restart: unless-stopped
+    volumes:
+      - ../obs/prometheus/prometheus-dev.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "19090:9090"
+    networks:
+      - nextlook-dev-net

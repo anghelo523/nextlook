@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: nextlook-eureka
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  # "optional:" para que el servicio siga arrancando (con los defaults de Spring) si el
+  # Config Server todavia no esta arriba; en dev/prod normalmente si lo esta.
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:18888}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus

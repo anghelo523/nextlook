@@ -135,6 +135,7 @@ Convención del diagrama: las flechas continuas representan comunicación síncr
 
 ## Contenido de esta documentación
 
+- [Estado de avance](avance.md): qué está implementado y corriendo hoy, y el roadmap de fases pendientes.
 - [Brief técnico](brief.md): ficha completa del proyecto, equipo y microservicios, aprobada por el docente.
 - [Arquitectura](arquitectura.md): los diagramas C4 con su explicación detallada.
 - [Microservicios](microservicios/orden-ms.md): ficha por servicio (responsable, tipo, endpoints, entidades).
