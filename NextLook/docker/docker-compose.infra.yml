@@ -1,0 +1,261 @@
+# Infraestructura de DESARROLLO de NextLook: Config Server, Eureka, Gateway, las 8 bases
+# Postgres y Keycloak. Pensado para que cada integrante corra SOLO sus microservicios
+# asignados con Maven (mvn spring-boot:run) contra esta infraestructura ya dockerizada.
+# La pila completa dockerizada (infra + los 8 microservicios + Kafka + observabilidad)
+# se arma en Fase 7 (docker-compose de produccion local).
+name: nextlook-infra-dev
+
+services:
+
+  nextlook-config:
+    build:
+      context: ../infra/config-server
+      dockerfile: Dockerfile
+    container_name: nextlook-config
+    restart: unless-stopped
+    ports:
+      - "18888:18888"
+    volumes:
+      - ../infra/config-repo:/app/config-repo:ro
+    environment:
+      SPRING_PROFILES_ACTIVE: native
+      CONFIG_REPO_LOCATION: file:/app/config-repo
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/18888' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks:
+      - nextlook-dev-net
+
+  nextlook-eureka:
+    build:
+      context: ../infra/eureka-server
+      dockerfile: Dockerfile
+    container_name: nextlook-eureka
+    restart: unless-stopped
+    ports:
+      - "18761:18761"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://nextlook-config:18888
+    depends_on:
+      nextlook-config:
+        condition: service_healthy
+    networks:
+      - nextlook-dev-net
+
+  nextlook-gateway:
+    build:
+      context: ../infra/gateway
+      dockerfile: Dockerfile
+    container_name: nextlook-gateway
+    restart: unless-stopped
+    ports:
+      - "18080:18080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://nextlook-config:18888
+      # El archivo nextlook-gateway-dev.yml del config-repo apunta a Eureka por "localhost",
+      # pensado para microservicios corridos con Maven fuera de Docker. Dentro de este
+      # contenedor "localhost" es el propio gateway, asi que se sobreescribe solo aqui.
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
+    depends_on:
+      nextlook-config:
+        condition: service_healthy
+      nextlook-eureka:
+        condition: service_started
+    networks:
+      - nextlook-dev-net
+
+  postgres-catalogo:
+    image: postgres:16-alpine
+    container_name: nextlook-postgres-catalogo
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: catalogo_db
+      POSTGRES_USER: nextlook
+      POSTGRES_PASSWORD: nextlook
+    ports:
+      - "15432:5432"
+    volumes:
+      - nextlook_catalogo_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nextlook -d catalogo_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - nextlook-dev-net
+
+  postgres-inventario:
+    image: postgres:16-alpine
+    container_name: nextlook-postgres-inventario
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: inventario_db
+      POSTGRES_USER: nextlook
+      POSTGRES_PASSWORD: nextlook
+    ports:
+      - "15433:5432"
+    volumes:
+      - nextlook_inventario_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nextlook -d inventario_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - nextlook-dev-net
+
+  postgres-resenas:
+    image: postgres:16-alpine
+    container_name: nextlook-postgres-resenas
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: resenas_db
+      POSTGRES_USER: nextlook
+      POSTGRES_PASSWORD: nextlook
+    ports:
+      - "15434:5432"
+    volumes:
+      - nextlook_resenas_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nextlook -d resenas_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - nextlook-dev-net
+
+  postgres-orden:
+    image: postgres:16-alpine
+    container_name: nextlook-postgres-orden
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: orden_db
+      POSTGRES_USER: nextlook
+      POSTGRES_PASSWORD: nextlook
+    ports:
+      - "15435:5432"
+    volumes:
+      - nextlook_orden_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nextlook -d orden_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - nextlook-dev-net
+
+  postgres-pago:
+    image: postgres:16-alpine
+    container_name: nextlook-postgres-pago
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pago_db
+      POSTGRES_USER: nextlook
+      POSTGRES_PASSWORD: nextlook
+    ports:
+      - "15436:5432"
+    volumes:
+      - nextlook_pago_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nextlook -d pago_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - nextlook-dev-net
+
+  postgres-cliente:
+    image: postgres:16-alpine
+    container_name: nextlook-postgres-cliente
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cliente_db
+      POSTGRES_USER: nextlook
+      POSTGRES_PASSWORD: nextlook
+    ports:
+      - "15437:5432"
+    volumes:
+      - nextlook_cliente_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nextlook -d cliente_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - nextlook-dev-net
+
+  postgres-envio:
+    image: postgres:16-alpine
+    container_name: nextlook-postgres-envio
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: envio_db
+      POSTGRES_USER: nextlook
+      POSTGRES_PASSWORD: nextlook
+    ports:
+      - "15438:5432"
+    volumes:
+      - nextlook_envio_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nextlook -d envio_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - nextlook-dev-net
+
+  postgres-notificaciones:
+    image: postgres:16-alpine
+    container_name: nextlook-postgres-notificaciones
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: notificaciones_db
+      POSTGRES_USER: nextlook
+      POSTGRES_PASSWORD: nextlook
+    ports:
+      - "15439:5432"
+    volumes:
+      - nextlook_notificaciones_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nextlook -d notificaciones_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - nextlook-dev-net
+
+  # Keycloak en modo start-dev (HTTP plano, sin TLS). El puerto host 18443 sigue la
+  # convencion de la tabla de puertos del equipo, pero el proceso escucha HTTP normal
+  # (KC_HTTP_PORT=8080) - la configuracion TLS real, si se necesita, es trabajo de Fase 3.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: nextlook-keycloak
+    restart: unless-stopped
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8080
+    ports:
+      - "18443:8080"
+    networks:
+      - nextlook-dev-net
+
+networks:
+  nextlook-dev-net:
+    name: nextlook-dev-net
+
+volumes:
+  nextlook_catalogo_dev_data:
+  nextlook_inventario_dev_data:
+  nextlook_resenas_dev_data:
+  nextlook_orden_dev_data:
+  nextlook_pago_dev_data:
+  nextlook_cliente_dev_data:
+  nextlook_envio_dev_data:
+  nextlook_notificaciones_dev_data:

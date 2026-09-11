@@ -1,0 +1,37 @@
+# Placeholder - inventario-ms todavia no esta implementado (ver Fase 2 del plan de construccion).
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres-inventario:5432/inventario_db
+    username: nextlook
+    password: nextlook
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.nextlook.inventario: INFO
+
+eureka:
+  instance:
+    instance-id: ${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: http://nextlook-eureka:8761/eureka
+
+management:
+  endpoint:
+    health:
+      show-details: never

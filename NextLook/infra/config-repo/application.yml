@@ -1,0 +1,14 @@
+# Configuracion comun a TODOS los clientes del Config Server (infra y microservicios).
+# Cada archivo <servicio>-<perfil>.yml puede sobreescribir cualquiera de estas claves.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n"

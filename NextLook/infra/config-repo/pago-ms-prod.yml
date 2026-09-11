@@ -1,0 +1,38 @@
+# Placeholder - pago-ms todavia no esta implementado (ver Fase 2 y Fase 5 del plan de construccion).
+# Las credenciales de Mercado Pago Sandbox se inyectan por variable de entorno (ver Fase 5), nunca hardcodeadas aqui.
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres-pago:5432/pago_db
+    username: nextlook
+    password: nextlook
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.nextlook.pago: INFO
+
+eureka:
+  instance:
+    instance-id: ${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: http://nextlook-eureka:8761/eureka
+
+management:
+  endpoint:
+    health:
+      show-details: never
