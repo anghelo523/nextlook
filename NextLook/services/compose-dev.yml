@@ -1,0 +1,177 @@
+# Levanta los 8 microservicios de NextLook sobre la infraestructura de
+# docker/docker-compose.infra.yml (Config Server, Eureka, Gateway, Postgres). Se combina
+# con ese archivo, no se corre solo (y SIEMPRE con docker-compose.infra.yml como PRIMER -f:
+# Docker Compose resuelve las rutas relativas de todos los archivos contra la carpeta del
+# primer -f, por eso los "context:" de abajo son relativos a docker/, no a este archivo):
+#   docker compose -f docker/docker-compose.infra.yml -f services/compose-dev.yml up -d --build
+name: nextlook-services-dev
+
+services:
+
+  catalogo-ms:
+    build:
+      context: ../services/catalogo-ms
+    container_name: catalogo-ms
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://nextlook-config:18888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-catalogo:5432/catalogo_db
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
+      EUREKA_INSTANCE_HOSTNAME: catalogo-ms
+    depends_on:
+      nextlook-config:
+        condition: service_healthy
+      postgres-catalogo:
+        condition: service_healthy
+    networks:
+      - nextlook-dev-net
+
+  inventario-ms:
+    build:
+      context: ../services/inventario-ms
+    container_name: inventario-ms
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://nextlook-config:18888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-inventario:5432/inventario_db
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
+      EUREKA_INSTANCE_HOSTNAME: inventario-ms
+    depends_on:
+      nextlook-config:
+        condition: service_healthy
+      postgres-inventario:
+        condition: service_healthy
+    networks:
+      - nextlook-dev-net
+
+  resenas-ms:
+    build:
+      context: ../services/resenas-ms
+    container_name: resenas-ms
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://nextlook-config:18888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-resenas:5432/resenas_db
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
+      EUREKA_INSTANCE_HOSTNAME: resenas-ms
+    depends_on:
+      nextlook-config:
+        condition: service_healthy
+      postgres-resenas:
+        condition: service_healthy
+    networks:
+      - nextlook-dev-net
+
+  orden-ms:
+    build:
+      context: ../services/orden-ms
+    container_name: orden-ms
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://nextlook-config:18888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-orden:5432/orden_db
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
+      EUREKA_INSTANCE_HOSTNAME: orden-ms
+    depends_on:
+      nextlook-config:
+        condition: service_healthy
+      postgres-orden:
+        condition: service_healthy
+    networks:
+      - nextlook-dev-net
+
+  pago-ms:
+    build:
+      context: ../services/pago-ms
+    container_name: pago-ms
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://nextlook-config:18888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-pago:5432/pago_db
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
+      EUREKA_INSTANCE_HOSTNAME: pago-ms
+    depends_on:
+      nextlook-config:
+        condition: service_healthy
+      postgres-pago:
+        condition: service_healthy
+    networks:
+      - nextlook-dev-net
+
+  cliente-ms:
+    build:
+      context: ../services/cliente-ms
+    container_name: cliente-ms
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://nextlook-config:18888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-cliente:5432/cliente_db
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
+      EUREKA_INSTANCE_HOSTNAME: cliente-ms
+    depends_on:
+      nextlook-config:
+        condition: service_healthy
+      postgres-cliente:
+        condition: service_healthy
+    networks:
+      - nextlook-dev-net
+
+  envio-ms:
+    build:
+      context: ../services/envio-ms
+    container_name: envio-ms
+    restart: unless-stopped
+    ports:
+      - "8087:8087"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://nextlook-config:18888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-envio:5432/envio_db
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
+      EUREKA_INSTANCE_HOSTNAME: envio-ms
+    depends_on:
+      nextlook-config:
+        condition: service_healthy
+      postgres-envio:
+        condition: service_healthy
+    networks:
+      - nextlook-dev-net
+
+  notificaciones-ms:
+    build:
+      context: ../services/notificaciones-ms
+    container_name: notificaciones-ms
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://nextlook-config:18888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-notificaciones:5432/notificaciones_db
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
+      EUREKA_INSTANCE_HOSTNAME: notificaciones-ms
+    depends_on:
+      nextlook-config:
+        condition: service_healthy
+      postgres-notificaciones:
+        condition: service_healthy
+    networks:
+      - nextlook-dev-net

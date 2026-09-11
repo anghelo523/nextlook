@@ -9,7 +9,7 @@ services:
 
   nextlook-config:
     build:
-      context: ../infra/config-server
+      context: ../infra/nextlook-config
       dockerfile: Dockerfile
     container_name: nextlook-config
     restart: unless-stopped
@@ -17,9 +17,12 @@ services:
       - "18888:18888"
     volumes:
       - ../infra/config-repo:/app/config-repo:ro
+      - ../infra/nextlook-eureka/config:/app/nextlook-eureka/config:ro
+      - ../infra/nextlook-gateway/config:/app/nextlook-gateway/config:ro
+      - ../services:/app/services:ro
     environment:
       SPRING_PROFILES_ACTIVE: native
-      CONFIG_REPO_LOCATION: file:/app/config-repo
+      CONFIG_SEARCH_LOCATIONS: file:/app/config-repo,file:/app/nextlook-eureka/config,file:/app/nextlook-gateway/config,file:/app/services/{application}/config
     healthcheck:
       test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/18888' || exit 1"]
       interval: 5s
@@ -31,7 +34,7 @@ services:
 
   nextlook-eureka:
     build:
-      context: ../infra/eureka-server
+      context: ../infra/nextlook-eureka
       dockerfile: Dockerfile
     container_name: nextlook-eureka
     restart: unless-stopped
@@ -48,7 +51,7 @@ services:
 
   nextlook-gateway:
     build:
-      context: ../infra/gateway
+      context: ../infra/nextlook-gateway
       dockerfile: Dockerfile
     container_name: nextlook-gateway
     restart: unless-stopped
@@ -57,10 +60,12 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       CONFIG_SERVER_URL: http://nextlook-config:18888
-      # El archivo nextlook-gateway-dev.yml del config-repo apunta a Eureka por "localhost",
-      # pensado para microservicios corridos con Maven fuera de Docker. Dentro de este
-      # contenedor "localhost" es el propio gateway, asi que se sobreescribe solo aqui.
+      # El archivo nextlook-gateway-dev.yml (infra/nextlook-gateway/config) apunta a Eureka por "localhost"
+      # y se registra a si mismo como "localhost", pensado para microservicios corridos con Maven fuera
+      # de Docker. Dentro de este contenedor "localhost" es el propio gateway (nadie mas lo alcanzaria
+      # asi), por eso se sobreescribe solo aqui.
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
+      EUREKA_INSTANCE_HOSTNAME: nextlook-gateway
     depends_on:
       nextlook-config:
         condition: service_healthy
