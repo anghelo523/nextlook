@@ -1,0 +1,56 @@
+server:
+  port: 18080
+
+# Convencion de rutas: /api/v1/<recurso>/** -> lb://<microservicio>
+# Los recursos exactos se ajustaran cuando cada microservicio defina su contrato REST final
+# (ver docs/microservicios/*.md, seccion "Endpoints", todavia con TODO).
+spring:
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: nextlook-catalogo-categorias
+              uri: lb://catalogo-ms
+              predicates:
+                - Path=/api/v1/categorias/**
+            - id: nextlook-catalogo-productos
+              uri: lb://catalogo-ms
+              predicates:
+                - Path=/api/v1/productos/**
+            - id: nextlook-inventario
+              uri: lb://inventario-ms
+              predicates:
+                - Path=/api/v1/inventario/**
+            - id: nextlook-resenas
+              uri: lb://resenas-ms
+              predicates:
+                - Path=/api/v1/resenas/**
+            - id: nextlook-ordenes
+              uri: lb://orden-ms
+              predicates:
+                - Path=/api/v1/ordenes/**
+            - id: nextlook-pagos
+              uri: lb://pago-ms
+              predicates:
+                - Path=/api/v1/pagos/**
+            - id: nextlook-clientes
+              uri: lb://cliente-ms
+              predicates:
+                - Path=/api/v1/clientes/**
+            - id: nextlook-envios
+              uri: lb://envio-ms
+              predicates:
+                - Path=/api/v1/envios/**
+            - id: nextlook-notificaciones
+              uri: lb://notificaciones-ms
+              predicates:
+                - Path=/api/v1/notificaciones/**
+
+eureka:
+  instance:
+    hostname: localhost
+    instance-id: ${spring.application.name}:${server.port}
+  client:
+    service-url:
+      defaultZone: http://localhost:18761/eureka
