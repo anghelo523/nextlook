@@ -1,0 +1,166 @@
+<div class="pagina">
+  <header class="cabecera-pagina">
+    <div>
+      <p class="eyebrow">Panel de administracion</p>
+      <h1 class="titulo">Productos</h1>
+      <p>Solo el administrador puede publicar prendas, cambiar sus fotos o retirarlas del catalogo.</p>
+    </div>
+    @if (!formAbierto()) {
+      <button type="button" class="acento" (click)="abrirForm()"><app-icono nombre="mas" [tam]="18" /> Nueva prenda</button>
+    }
+  </header>
+
+  @if (exito()) { <p class="aviso ok aparece"><app-icono nombre="check" [tam]="18" /> {{ exito() }}</p> }
+  @if (error()) { <p class="aviso mal">{{ error() }}</p> }
+
+  <!-- ================= alta de prenda ================= -->
+  @if (formAbierto()) {
+    <section class="panel alta aparece">
+      <div class="alta-cabecera">
+        <h2>Nueva prenda</h2>
+        <button type="button" class="texto" (click)="formAbierto.set(false)">Cancelar</button>
+      </div>
+
+      <div class="alta-cuerpo">
+        <label class="zona-foto" [class.con-foto]="vistaPrevia()">
+          @if (vistaPrevia(); as src) {
+            <img [src]="src" alt="Vista previa de la foto" />
+            <span class="cambiar">Cambiar foto</span>
+          } @else {
+            <app-icono nombre="imagen" [tam]="40" [grosor]="1.3" />
+            <strong>Sube la foto de referencia</strong>
+            <small>JPG, PNG o WEBP · se ajusta a 1000 px</small>
+          }
+          <input type="file" accept="image/jpeg,image/png,image/webp" class="visualmente-oculto"
+                 (change)="elegirFoto($any($event.target).files?.[0])" />
+        </label>
+
+        <form class="datos" (ngSubmit)="guardar()">
+          <div class="rejilla-form">
+            <label class="campo completo">Nombre
+              <input name="nombre" [(ngModel)]="form.nombre" maxlength="120" placeholder="Ej. Casaca puffer negra" />
+            </label>
+            <label class="campo">Marca
+              <input name="marca" [(ngModel)]="form.marca" maxlength="80" placeholder="NextLook Street" />
+            </label>
+            <label class="campo">Precio (S/)
+              <input name="precio" type="number" min="0.1" step="0.1" [(ngModel)]="form.precio" placeholder="149.90" />
+            </label>
+            <label class="campo">Genero
+              <select name="genero" [(ngModel)]="form.genero">
+                <option value="UNISEX">Unisex</option>
+                <option value="MUJER">Mujer</option>
+                <option value="HOMBRE">Hombre</option>
+              </select>
+            </label>
+            <label class="campo">Categoria
+              <select name="categoria" [(ngModel)]="form.categoriaId">
+                <option [ngValue]="null" disabled>Elige una</option>
+                @for (c of categorias(); track c.id) { <option [ngValue]="c.id">{{ c.nombre }}</option> }
+              </select>
+            </label>
+            <div class="campo nueva-cat">
+              <span>¿Otra categoria?</span>
+              <div class="en-linea">
+                <input name="nuevaCategoria" [(ngModel)]="nuevaCategoria" maxlength="80" placeholder="Ej. Shorts" />
+                <button type="button" class="secundario chico" (click)="crearCategoria()">Crear</button>
+              </div>
+            </div>
+            <label class="campo completo">Descripcion
+              <textarea name="descripcion" [(ngModel)]="form.descripcion" maxlength="255" placeholder="Tela, calce y detalles"></textarea>
+            </label>
+          </div>
+
+          <h3 class="sub">Tallas, colores y stock</h3>
+          <div class="variantes">
+            <div class="fila cabeza"><span>Talla</span><span>Color</span><span>Stock inicial</span><span></span></div>
+            @for (f of filas; track $index; let i = $index) {
+              <div class="fila">
+                <input [name]="'talla' + i" [(ngModel)]="f.talla" maxlength="10" placeholder="M / 32 / UNICA" aria-label="Talla" />
+                <input [name]="'color' + i" [(ngModel)]="f.color" maxlength="40" placeholder="Negro" aria-label="Color" />
+                <input [name]="'stock' + i" type="number" min="0" [(ngModel)]="f.stock" aria-label="Stock inicial" />
+                <button type="button" class="texto" [disabled]="filas.length === 1" (click)="quitarFila(i)" aria-label="Quitar variante">
+                  <app-icono nombre="basura" [tam]="18" />
+                </button>
+              </div>
+            }
+            <button type="button" class="secundario chico" (click)="agregarFila()"><app-icono nombre="mas" [tam]="16" /> Agregar talla o color</button>
+          </div>
+
+          <div class="alta-acciones">
+            <button type="submit" class="acento" [disabled]="guardando()">
+              @if (guardando()) { <span class="giro"></span> Publicando… } @else { Publicar en el catalogo }
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+  }
+
+  <!-- ================= listado ================= -->
+  <div class="barra-lista">
+    <p class="muted">{{ filtradas().length }} prendas a la venta</p>
+    <input type="search" class="buscar" placeholder="Buscar por nombre, marca o categoria"
+           [value]="busqueda()" (input)="busqueda.set($any($event.target).value)" />
+  </div>
+
+  @if (cargando()) {
+    <p class="muted"><span class="giro"></span> Cargando…</p>
+  } @else {
+    <div class="tabla-scroll">
+      <table>
+        <thead>
+          <tr><th>Prenda</th><th>Categoria</th><th>Precio</th><th>Variantes</th><th>Stock</th><th></th></tr>
+        </thead>
+        <tbody>
+          @for (p of filtradas(); track p.id) {
+            <tr>
+              <td>
+                <div class="prenda-celda">
+                  <div class="mini">
+                    @if (urlImagen(p.imagenUrl); as src) { <img [src]="src" alt="" loading="lazy" /> }
+                    @else { <app-icono nombre="imagen" [tam]="20" /> }
+                  </div>
+                  <div>
+                    <strong>{{ p.nombre }}</strong>
+                    <span class="muted">{{ p.marca }} · #{{ p.id }}</span>
+                  </div>
+                </div>
+              </td>
+              <td>{{ p.categoria.nombre }}</td>
+              <td>{{ soles(p.precio) }}</td>
+              <td class="variantes-celda">
+                @for (v of p.variantes; track v.id) {
+                  <span class="chip neutro" [title]="v.sku">{{ v.talla }} · {{ v.color }}</span>
+                }
+              </td>
+              <td><span class="chip" [class.mal]="stockTotal(p) === 0" [class.ok]="stockTotal(p) > 0">{{ stockTotal(p) }} u.</span></td>
+              <td class="acciones-celda">
+                <label class="btn secundario chico" [class.ocupado]="subiendoFoto() === p.id">
+                  @if (subiendoFoto() === p.id) { <span class="giro"></span> } @else { <app-icono nombre="imagen" [tam]="15" /> }
+                  Foto
+                  <input type="file" accept="image/jpeg,image/png,image/webp" class="visualmente-oculto"
+                         (change)="cambiarFoto(p, $any($event.target).files?.[0])" />
+                </label>
+                <button type="button" class="peligro chico" (click)="aRetirar.set(p)">Retirar</button>
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="6" class="muted">No hay prendas que coincidan.</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
+
+@if (aRetirar(); as p) {
+  <app-confirmar-dialogo
+    titulo="¿Retirar esta prenda?"
+    [texto]="'«' + p.nombre + '» dejara de mostrarse en el catalogo. Los pedidos que ya la incluyen no cambian.'"
+    textoConfirmar="Si, retirar"
+    [peligro]="true"
+    [ocupado]="guardando()"
+    (confirmar)="confirmarRetiro()"
+    (cancelar)="aRetirar.set(null)" />
+}

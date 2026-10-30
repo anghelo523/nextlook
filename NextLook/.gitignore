@@ -17,3 +17,8 @@ Thumbs.db
 
 # MkDocs
 site/
+
+# Frontend: nextlook-web/ lo genera frontend/crear-frontend.ps1 (Angular CLI) a partir de nextlook-web-src/
+frontend/nextlook-web/
+node_modules/
+.angular/

@@ -1,16 +1,47 @@
-# Placeholder - orden-ms todavia no esta implementado (ver Fase 1 del plan de construccion).
 server:
   port: 8080
 
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://keycloak:8080/realms/nextlook/protocol/openid-connect/certs
   datasource:
     url: jdbc:postgresql://postgres-orden:5432/orden_db
     username: nextlook
     password: nextlook
     driver-class-name: org.postgresql.Driver
+    # S10: si la base no responde, el chequeo 'db' de readiness falla en 3 s (no en los 30 s por defecto)
+    hikari:
+      connection-timeout: 3000
   flyway:
     enabled: true
     locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: nextlook-kafka:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: orden-ms
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        spring.json.value.default.type: com.nextlook.orden.event.StockEvento
+        spring.json.trusted.packages: com.nextlook.orden.event
+        spring.json.use.type.headers: false
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connect-timeout: 2000
+            read-timeout: 3000
   jpa:
     hibernate:
       ddl-auto: validate
@@ -31,7 +62,73 @@ eureka:
     service-url:
       defaultZone: http://nextlook-eureka:8761/eureka
 
+app:
+  kafka:
+    topic:
+      orden: orden-eventos
+      inventario: inventario-eventos
+      pago: pago-eventos
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 5
+        minimum-number-of-calls: 3
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 15s
+        permitted-number-of-calls-in-half-open-state: 2
+        automatic-transition-from-open-to-half-open-enabled: true
+        register-health-indicator: true
+        ignore-exceptions:
+          - com.nextlook.orden.exception.ResourceNotFoundException
+          - com.nextlook.orden.exception.ReglaNegocioException
+    instances:
+      cliente:
+        base-config: default
+      catalogo:
+        base-config: default
+  retry:
+    configs:
+      default:
+        max-attempts: 3
+        wait-duration: 400ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        # solo fallos de infraestructura: conexion rechazada, timeout, 5xx, sin instancias en Eureka
+        retry-exceptions:
+          - feign.RetryableException
+          - feign.FeignException$ServiceUnavailable
+          - feign.FeignException$BadGateway
+          - feign.FeignException$GatewayTimeout
+          - feign.FeignException$InternalServerError
+        ignore-exceptions:
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+          - com.nextlook.orden.exception.ResourceNotFoundException
+          - com.nextlook.orden.exception.ReglaNegocioException
+    instances:
+      cliente:
+        base-config: default
+      catalogo:
+        base-config: default
+
+# S10 - liveness (el proceso vive) y readiness (puede atender: su base responde)
 management:
   endpoint:
     health:
       show-details: never
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState, db
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,circuitbreakers,circuitbreakerevents,retries,retryevents
+  health:
+    circuitbreakers:
+      enabled: true

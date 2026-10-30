@@ -1,13 +1,16 @@
 apiVersion: 1
 
+# uid fijo: el tablero (dashboards/nextlook-diagnostico.json) referencia cada fuente por su uid.
 datasources:
   - name: Prometheus
+    uid: prometheus
     type: prometheus
     access: proxy
     url: http://nextlook-prometheus:9090
     isDefault: true
 
   - name: Loki
+    uid: loki
     type: loki
     access: proxy
     url: http://nextlook-loki:3100

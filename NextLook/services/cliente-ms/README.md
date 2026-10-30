@@ -15,7 +15,7 @@ Detalle completo (endpoints, entidades, rol protegido, comunicación): [../../do
 
 ## Estado actual
 
-Implementado como esqueleto Spring Boot bootable (sin logica de negocio todavia: sin entidades, repositorios ni controladores, ver TODOs en la doc de arriba). Ya se registra en Eureka, expone `/actuator/health` y `/actuator/prometheus`, y se conecta a su base y al Config Server. Se levanta junto con el resto de microservicios:
+Implementado (U2): perfil del comprador ligado al `sub` del JWT y sus direcciones de envío (`/api/v1/clientes/me`). `orden-ms` lo consume por Feign reenviando el token. Ya se registra en Eureka, expone `/actuator/health` y `/actuator/prometheus`, y se conecta a su base y al Config Server. Se levanta junto con el resto de microservicios:
 
 ```
 docker compose -f ../../docker/docker-compose.infra.yml -f ../compose-dev.yml up -d --build cliente-ms

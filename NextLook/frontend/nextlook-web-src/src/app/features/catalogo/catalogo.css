@@ -1,0 +1,86 @@
+.banner { background: var(--tinta); color: var(--blanco); }
+.banner-interno { max-width: var(--ancho); margin: 0 auto; padding: 3.2rem 1.25rem 2.6rem; }
+.banner .eyebrow { color: var(--acento); }
+.banner h1 { font-size: clamp(2.8rem, 8vw, 6rem); margin-top: 0.4rem; }
+
+/* ---------- filtros ---------- */
+.filtros {
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;
+  padding-bottom: 1.2rem; border-bottom: 1px solid var(--linea); margin-bottom: 1rem;
+}
+.categorias { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.filtro {
+  min-height: 38px; padding: 0 1rem; background: transparent; color: var(--tinta);
+  border: 1.5px solid var(--linea-fuerte); border-radius: 999px; font-size: 0.72rem;
+}
+.filtro:hover { border-color: var(--tinta); background: transparent; }
+.filtro.activo { background: var(--tinta); border-color: var(--tinta); color: var(--blanco); }
+.filtros-derecha { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.segmento { display: inline-flex; border: 1.5px solid var(--tinta); border-radius: var(--radio); overflow: hidden; }
+.segmento button {
+  min-height: 38px; padding: 0 0.85rem; border: none; border-radius: 0;
+  background: transparent; color: var(--tinta); font-size: 0.7rem;
+}
+.segmento button + button { border-left: 1.5px solid var(--tinta); }
+.segmento button.activo { background: var(--tinta); color: var(--blanco); }
+.orden select { min-height: 40px; width: auto; font-size: 0.85rem; padding: 0.3rem 2rem 0.3rem 0.8rem; }
+.conteo { margin: 0 0 1.2rem; color: var(--suave); font-size: 0.85rem; }
+
+/* ---------- grilla ---------- */
+.grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 2.2rem 1.4rem; }
+.tarjeta { display: flex; flex-direction: column; }
+.foto {
+  position: relative; aspect-ratio: 4 / 5; overflow: hidden; border-radius: var(--radio);
+  background: var(--hueso); margin-bottom: 1rem;
+}
+.foto img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s cubic-bezier(.2,.7,.2,1); }
+.tarjeta:hover .foto img { transform: scale(1.05); }
+.sin-foto {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-family: var(--display); font-size: 2rem; text-transform: uppercase; color: var(--linea-fuerte);
+}
+.etiqueta-genero {
+  position: absolute; top: 0.8rem; left: 0.8rem; padding: 0.25rem 0.6rem; border-radius: 2px;
+  background: var(--blanco); font-size: 0.62rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase;
+}
+
+.info { display: flex; flex-direction: column; flex: 1; }
+.info .eyebrow { margin: 0; }
+.nombre { font-family: var(--texto); text-transform: none; font-size: 1.05rem; font-weight: 700; letter-spacing: 0; margin: 0.25rem 0 0.15rem; line-height: 1.3; }
+.precio { margin: 0; font-size: 1.05rem; font-weight: 500; }
+.descripcion { margin: 0.4rem 0 0; color: var(--suave); font-size: 0.84rem; line-height: 1.45; }
+
+.opciones { margin: 0.9rem 0 1rem; flex: 1; }
+.opcion-titulo { margin: 0.6rem 0 0.4rem; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--suave); }
+.opcion-titulo strong { color: var(--tinta); }
+.pildoras { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.pildora, .talla {
+  min-height: 34px; padding: 0 0.75rem; background: var(--blanco); color: var(--tinta);
+  border: 1.5px solid var(--linea-fuerte); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: none; font-weight: 600;
+}
+.talla { min-width: 42px; padding: 0 0.6rem; }
+.pildora:hover, .talla:hover { border-color: var(--tinta); background: var(--blanco); }
+.pildora.activo, .talla.activo { border-color: var(--tinta); background: var(--tinta); color: var(--blanco); }
+
+.vacio { grid-column: 1 / -1; padding: 3rem 0; text-align: center; color: var(--suave); }
+
+/* ---------- carga ---------- */
+.esqueleto .foto, .esqueleto .linea { background: linear-gradient(90deg, var(--hueso), #ebe7dd, var(--hueso)); background-size: 200% 100%; animation: brillo 1.2s infinite; }
+.esqueleto .linea { height: 14px; border-radius: 3px; margin-top: 0.6rem; width: 80%; }
+.esqueleto .linea.corta { width: 40%; }
+@keyframes brillo { to { background-position: -200% 0; } }
+
+@media (max-width: 600px) {
+  /* minmax(0, 1fr): la columna no crece por el contenido sin cortes (botones, pildoras) */
+  .grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.6rem 0.8rem; }
+  .descripcion { display: none; }
+  .categorias { flex-wrap: nowrap; overflow-x: auto; margin: 0 -1.25rem; padding: 0 1.25rem 0.3rem; scrollbar-width: none; width: calc(100% + 2.5rem); }
+  .categorias::-webkit-scrollbar { display: none; }
+  .filtro { flex: none; }
+  .filtros-derecha { width: 100%; }
+  .segmento { flex: 1; }
+  .segmento button { flex: 1; padding: 0 0.4rem; }
+  .orden, .orden select { width: 100%; }
+  .tarjeta button.ancho { white-space: normal; min-height: 44px; padding: 0.5rem 0.6rem; font-size: 0.68rem; line-height: 1.2; }
+  .nombre { font-size: 0.92rem; }
+}

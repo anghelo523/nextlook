@@ -1,0 +1,96 @@
+<section class="banner">
+  <div class="banner-interno">
+    <p class="eyebrow">NextLook · Tienda</p>
+    <h1>{{ tituloCategoria() }}</h1>
+  </div>
+</section>
+
+<div class="pagina">
+  <div class="filtros">
+    <div class="categorias" role="group" aria-label="Categoria">
+      <button type="button" class="filtro" [class.activo]="categoriaActual() === null" (click)="filtrar({ categoria: null })">Todo</button>
+      @for (c of categorias(); track c.id) {
+        <button type="button" class="filtro" [class.activo]="categoriaActual() === c.id" (click)="filtrar({ categoria: c.id })">{{ c.nombre }}</button>
+      }
+    </div>
+    <div class="filtros-derecha">
+      <div class="segmento" role="group" aria-label="Genero">
+        @for (g of generos; track g.texto) {
+          <button type="button" [class.activo]="generoActual() === g.valor" (click)="filtrar({ genero: g.valor })">{{ g.texto }}</button>
+        }
+      </div>
+      <label class="orden">
+        <span class="visualmente-oculto">Ordenar</span>
+        <select [value]="orden()" (change)="orden.set($any($event.target).value)">
+          <option value="nuevo">Lo mas nuevo</option>
+          <option value="precio-asc">Precio: menor a mayor</option>
+          <option value="precio-desc">Precio: mayor a menor</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  @if (cargando()) {
+    <div class="grilla">
+      @for (n of [1, 2, 3, 4, 5, 6, 7, 8]; track n) {
+        <div class="tarjeta esqueleto"><div class="foto"></div><div class="linea"></div><div class="linea corta"></div></div>
+      }
+    </div>
+  } @else if (error()) {
+    <p class="aviso mal">{{ error() }}</p>
+  } @else {
+    <p class="conteo">{{ visibles().length }} {{ visibles().length === 1 ? 'prenda' : 'prendas' }}</p>
+    <div class="grilla">
+      @for (prenda of visibles(); track prenda.id) {
+        <article class="tarjeta aparece">
+          <div class="foto">
+            @if (urlImagen(prenda.imagenUrl); as src) {
+              <img [src]="src" [alt]="prenda.nombre" loading="lazy" />
+            } @else {
+              <span class="sin-foto">{{ prenda.categoria.nombre }}</span>
+            }
+            <span class="etiqueta-genero">{{ generoTexto(prenda.genero) }}</span>
+          </div>
+
+          <div class="info">
+            <p class="eyebrow">{{ prenda.marca }}</p>
+            <h3 class="nombre">{{ prenda.nombre }}</h3>
+            <p class="precio">{{ soles(prenda.precio) }}</p>
+            @if (prenda.descripcion) {
+              <p class="descripcion">{{ prenda.descripcion }}</p>
+            }
+
+            <div class="opciones">
+              <p class="opcion-titulo">Color · <strong>{{ eleccion()[prenda.id]?.color }}</strong></p>
+              <div class="pildoras">
+                @for (color of colores(prenda); track color) {
+                  <button type="button" class="pildora" [class.activo]="eleccion()[prenda.id]?.color === color"
+                          (click)="elegirColor(prenda, color)">{{ color }}</button>
+                }
+              </div>
+              <p class="opcion-titulo">Talla</p>
+              <div class="pildoras">
+                @for (v of tallas(prenda); track v.id) {
+                  <button type="button" class="talla" [class.activo]="eleccion()[prenda.id]?.varianteId === v.id"
+                          [attr.aria-pressed]="eleccion()[prenda.id]?.varianteId === v.id"
+                          (click)="elegirTalla(prenda, v)">{{ v.talla === 'UNICA' ? 'Unica' : v.talla }}</button>
+                }
+              </div>
+            </div>
+
+            @if (auth.tieneRol('CLIENTE')) {
+              <button type="button" class="ancho" [class.acento]="agregado() === prenda.id" (click)="agregar(prenda)">
+                @if (agregado() === prenda.id) { <app-icono nombre="check" [tam]="18" /> Agregado a tu bolsa }
+                @else { <app-icono nombre="bolsa" [tam]="18" /> Agregar a la bolsa }
+              </button>
+            } @else if (!auth.autenticado()) {
+              <button type="button" class="secundario ancho" (click)="auth.iniciarLogin('/catalogo')">Ingresa para comprar</button>
+            }
+          </div>
+        </article>
+      } @empty {
+        <p class="vacio">No hay prendas con estos filtros.</p>
+      }
+    </div>
+  }
+</div>

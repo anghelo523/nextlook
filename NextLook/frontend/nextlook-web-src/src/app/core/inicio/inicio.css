@@ -1,0 +1,88 @@
+/* ---------- hero ---------- */
+.hero {
+  position: relative; min-height: min(86vh, 760px); display: flex; align-items: flex-end;
+  color: var(--blanco); overflow: hidden; background: var(--tinta);
+}
+.hero-foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 30%; }
+.hero-velo { position: absolute; inset: 0; background: linear-gradient(180deg, rgb(14 14 14 / 5%) 30%, rgb(14 14 14 / 78%) 100%); }
+.hero-texto { position: relative; width: 100%; max-width: var(--ancho); margin: 0 auto; padding: 3rem 1.25rem 4rem; }
+.hero h1 { font-size: clamp(3.4rem, 11vw, 9rem); line-height: 0.9; margin: 0.6rem 0 1.2rem; }
+.hero h1 .serif { color: var(--acento); font-size: 1.05em; }
+.bajada { max-width: 46ch; font-size: 1.08rem; color: #e9e5dc; margin: 0 0 1.8rem; }
+.hero-acciones { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.talla { margin-top: 1.2rem; font-size: 0.9rem; color: #e9e5dc; }
+.eyebrow.claro { color: #e9e5dc; }
+
+/* ---------- beneficios ---------- */
+.beneficios {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: var(--hueso); border-bottom: 1px solid var(--linea);
+}
+.beneficios div {
+  display: flex; align-items: center; gap: 0.8rem; padding: 1.3rem 1.25rem; font-size: 0.88rem;
+  border-right: 1px solid var(--linea);
+}
+.beneficios div:last-child { border-right: none; }
+.beneficios strong { font-weight: 700; }
+
+/* ---------- secciones ---------- */
+.seccion { max-width: var(--ancho); margin: 0 auto; padding: 4.5rem 1.25rem 0; }
+.seccion-cabecera { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1.8rem; }
+.seccion-cabecera h2 .serif, .editorial h2 .serif, .banda h2 .serif { text-transform: none; }
+
+.categorias { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+.categoria {
+  position: relative; aspect-ratio: 3 / 4; overflow: hidden; border-radius: var(--radio);
+  background: var(--hueso); text-decoration: none; color: var(--blanco);
+}
+.categoria img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s cubic-bezier(.2,.7,.2,1); }
+.categoria::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgb(14 14 14 / 70%)); }
+.categoria:hover img { transform: scale(1.06); }
+.categoria-nombre {
+  position: absolute; left: 1.1rem; right: 1.1rem; bottom: 1rem; z-index: 1;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: var(--display); font-size: 1.7rem; text-transform: uppercase; letter-spacing: 0.02em;
+}
+
+/* ---------- editorial ---------- */
+.editorial {
+  max-width: var(--ancho); margin: 4.5rem auto 0; padding: 0 1.25rem;
+  display: grid; grid-template-columns: 1.05fr 1fr; gap: 3.5rem; align-items: center;
+}
+.editorial-foto { aspect-ratio: 4 / 5; overflow: hidden; border-radius: var(--radio); }
+.editorial-foto img { width: 100%; height: 100%; object-fit: cover; }
+.editorial-texto h2 { font-size: clamp(2.4rem, 5vw, 4rem); margin: 0.6rem 0 1.2rem; }
+.editorial-texto p:not(.eyebrow) { color: var(--suave); font-size: 1.02rem; max-width: 48ch; margin: 0 0 1.8rem; }
+
+/* ---------- novedades ---------- */
+.novedades { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2rem; }
+.novedad { text-decoration: none; }
+.novedad-foto { aspect-ratio: 4 / 5; overflow: hidden; border-radius: var(--radio); background: var(--hueso); margin-bottom: 0.8rem; }
+.novedad-foto img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s; }
+.novedad:hover img { transform: scale(1.04); }
+.novedad p { margin: 0; }
+.novedad-nombre { font-weight: 600; margin-top: 0.2rem !important; }
+.novedad-precio { color: var(--suave); }
+
+/* ---------- banda final ---------- */
+.banda {
+  position: relative; margin: 5rem 0 0; min-height: 360px; display: grid; place-items: center;
+  overflow: hidden; color: var(--blanco); text-align: center; background: var(--tinta);
+}
+.banda img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.55; }
+.banda-texto { position: relative; padding: 3rem 1.25rem; }
+.banda-texto h2 { font-size: clamp(2.4rem, 6vw, 4.6rem); }
+.banda-texto h2 .serif { color: var(--acento); }
+.banda-texto p { max-width: 44ch; margin: 1rem auto 0; color: #e9e5dc; font-size: 1.05rem; }
+
+@media (max-width: 900px) {
+  .beneficios { grid-template-columns: 1fr 1fr; }
+  .beneficios div:nth-child(2) { border-right: none; }
+  .beneficios div:nth-child(-n+2) { border-bottom: 1px solid var(--linea); }
+  .categorias, .novedades { grid-template-columns: 1fr 1fr; }
+  .editorial { grid-template-columns: 1fr; gap: 2rem; }
+}
+@media (max-width: 520px) {
+  .beneficios { grid-template-columns: 1fr; }
+  .beneficios div { border-right: none; border-bottom: 1px solid var(--linea); }
+}

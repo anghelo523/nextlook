@@ -1,8 +1,12 @@
-# Placeholder - envio-ms todavia no esta implementado (ver Fase 2 del plan de construccion).
 server:
   port: 8080
 
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://keycloak:8080/realms/nextlook/protocol/openid-connect/certs
   datasource:
     url: jdbc:postgresql://postgres-envio:5432/envio_db
     username: nextlook

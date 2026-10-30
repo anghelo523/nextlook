@@ -12,19 +12,25 @@ Integra la API real de Mercado Pago (Sandbox) y registra las transacciones. Reci
 
 ## Comunicación
 
-- **Síncrona (saliente):** `pago-ms` → Mercado Pago (API externa real, Sandbox), llamada directa para procesar el pago.
-- **Asíncrona (saliente):** `pago-ms` → `orden-ms` (evento con el resultado del pago); `pago-ms` → `inventario-ms` (evento con el resultado del pago); `pago-ms` → `notificaciones-ms` (evento de pago).
+- **Asíncrona (entrante):** `orden.creada` → registra el pago `PENDIENTE`; `stock.reservado` / `stock.rechazado` → habilita o anula el cobro.
+- **Síncrona (saliente):** `pago-ms` → pasarela (hoy simulada; Mercado Pago Sandbox pendiente).
+- **Asíncrona (saliente):** `pago.aprobado` / `pago.rechazado` en `pago-eventos`, después del commit.
 
 ## Endpoints
 
-<!-- TODO: completar cuando el servicio esté implementado -->
+| Método | Ruta | Rol | Descripción |
+|---|---|---|---|
+| POST | `/api/v1/pagos/procesar` | `CLIENTE` (dueño) | Cobra una orden en `LISTO_PARA_PAGAR`. Body `{ "ordenId": 1, "titular": "APRO" }`. |
+| GET | `/api/v1/pagos/orden/{ordenId}` | dueño o `ADMIN` | Estado del pago de una orden. |
+| GET | `/api/v1/pagos` | `ADMIN` | Todos los pagos. |
 
-### `POST /pagos/procesar`
-
-Ya confirmado en el brief: llama a la API real de Mercado Pago (Sandbox) y devuelve un estado `APROBADO`/`RECHAZADO`.
-
-<!-- TODO: completar request/response exactos cuando el servicio esté implementado -->
+!!! warning "Pasarela simulada"
+    Por ahora `PasarelaSimulada` reemplaza a Mercado Pago, con la misma convención de titulares de prueba del Sandbox: `APRO` aprueba, `FUND` rechaza por fondos, `OTHE` u otro rechaza. La integración real se conecta implementando la interfaz `PasarelaPago`.
 
 ## Entidades
 
-<!-- TODO: completar cuando el servicio esté implementado -->
+| Tabla | Campos clave |
+|---|---|
+| `pagos` | `id`, `orden_id` (**UNIQUE**), `keycloak_id`, `id_cliente`, `monto`, `metodo_pago`, `estado`, `titular`, `id_transaccion`, `motivo` |
+
+Estados: `PENDIENTE` (llegó `orden.creada`) → `LISTO_PARA_PAGAR` (llegó `stock.reservado`) → `APROBADO` / `RECHAZADO`; o `ANULADO` si llegó `stock.rechazado`.

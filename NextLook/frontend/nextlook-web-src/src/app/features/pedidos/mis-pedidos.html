@@ -1,0 +1,112 @@
+<div class="pagina">
+  <header class="cabecera-pagina">
+    <div>
+      <p class="eyebrow">Tu cuenta</p>
+      <h1 class="titulo">Mis pedidos</h1>
+    </div>
+    @if (ultimaConsulta(); as t) {
+      <p class="mono">Actualizado {{ t | date: 'HH:mm:ss' }}</p>
+    }
+  </header>
+
+  @if (cargando()) {
+    <div class="carga"><span class="giro"></span> Cargando tus pedidos…</div>
+  } @else {
+    @if (error()) { <p class="aviso mal">{{ error() }}</p> }
+    @if (detenido()) {
+      <p class="aviso">
+        <span>Algunos pedidos llevan mas de 2 minutos sin novedades: es probable que un servicio de NextLook este caido.
+          Tu pedido no se perdio.</span>
+        <button type="button" class="secundario chico" (click)="reiniciarEspera()">Volver a consultar</button>
+      </p>
+    } @else if (lento()) {
+      <p class="aviso">Esta tardando mas de lo normal. Seguimos consultando cada 10 segundos.</p>
+    }
+
+    <div class="lista">
+      @for (p of pedidos(); track p.orden.id) {
+        <article class="pedido" [class.transito]="enTransito(p)" [class.pagado]="p.orden.estado === 'PAGADA'">
+          <header class="pedido-cabecera">
+            <div>
+              <p class="numero">Pedido #{{ p.orden.id }}</p>
+              <p class="muted fecha">{{ p.orden.fechaCreacion | date: "d 'de' MMMM, HH:mm" }}</p>
+            </div>
+            <span class="chip {{ descripcion(p).tono }}">
+              @if (enTransito(p)) { <span class="giro"></span> }
+              @if (p.orden.estado === 'PAGADA') { <app-icono nombre="check" [tam]="13" [grosor]="2.6" /> }
+              {{ descripcion(p).texto }}
+            </span>
+          </header>
+
+          @if (etapa(p) >= 0) {
+            <ol class="linea-tiempo" [attr.aria-label]="'Progreso del pedido ' + p.orden.id">
+              @for (e of etapas; track e; let i = $index) {
+                <li [class.hecho]="i <= etapa(p)"><span class="punto"></span>{{ e }}</li>
+              }
+            </ol>
+          }
+
+          <ul class="items">
+            @for (i of p.orden.items; track i.varianteId) {
+              <li>
+                <div class="mini">
+                  @if (urlImagen(fotos().get(i.varianteId)); as src) { <img [src]="src" alt="" loading="lazy" /> }
+                </div>
+                <div>
+                  <p class="n">{{ i.nombrePrenda ?? 'Variante ' + i.varianteId }}</p>
+                  <p class="muted">{{ i.cantidad }} × {{ i.color }} · {{ i.talla === 'UNICA' ? 'Talla unica' : 'Talla ' + i.talla }}</p>
+                </div>
+              </li>
+            }
+          </ul>
+
+          <footer class="pedido-pie">
+            <div class="totales">
+              <span class="total">{{ soles(p.orden.total) }}</span>
+              @if (p.orden.estado === 'PAGADA') {
+                <span class="muted">Pagado con {{ nombreMetodo(p.orden.metodoPago) }}</span>
+              }
+              @if (p.pago?.idTransaccion && p.orden.estado === 'PAGADA') {
+                <span class="mono muted">Op. {{ p.pago?.idTransaccion }}</span>
+              }
+            </div>
+            <div class="acciones">
+              @if (puedeCancelar(p)) {
+                <button type="button" class="texto cancelar" (click)="aCancelar.set(p)">Ya no lo quiero</button>
+              }
+              @if (p.orden.estado === 'CARRITO') {
+                <button type="button" class="secundario" (click)="reintentarCarrito(p)">Reintentar confirmacion</button>
+              }
+              @if (puedePagar(p)) {
+                <button type="button" class="acento" (click)="pagar(p)">Pagar ahora <app-icono nombre="flecha" [tam]="18" /></button>
+              }
+            </div>
+          </footer>
+
+          @if (p.orden.estado === 'CANCELADA' && p.orden.observacion && !p.orden.observacion.startsWith('CANCELADA_POR_CLIENTE')) {
+            <p class="motivo">{{ p.orden.observacion }}</p>
+          }
+          <p class="tecnico mono">estado: {{ p.orden.estado }}{{ p.pago ? ' / pago ' + p.pago.estado : '' }}</p>
+        </article>
+      } @empty {
+        <div class="vacio">
+          <app-icono nombre="bolsa" [tam]="48" [grosor]="1.2" />
+          <h2>Aun no tienes pedidos</h2>
+          <a routerLink="/catalogo" class="btn acento">Ir al catalogo</a>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+@if (aCancelar(); as p) {
+  <app-confirmar-dialogo
+    titulo="¿Cancelar este pedido?"
+    [texto]="'Vas a cancelar el pedido #' + p.orden.id + ' por ' + soles(p.orden.total) + '. Liberaremos tus prendas y no se te cobrara nada. Esta accion no se puede deshacer.'"
+    textoConfirmar="Si, cancelar pedido"
+    textoCancelar="No, mantenerlo"
+    [peligro]="true"
+    [ocupado]="cancelando()"
+    (confirmar)="confirmarCancelacion()"
+    (cancelar)="aCancelar.set(null)" />
+}

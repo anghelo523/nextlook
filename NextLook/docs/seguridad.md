@@ -1,64 +1,57 @@
 # Seguridad
 
-Keycloak actúa como Identity Provider centralizado y emite JWT. Cada uno de los 8 microservicios valida el token de forma independiente — no hay un componente central (Gateway u otro) confirmado en el brief que intercepte y valide por todos.
+Keycloak actúa como Identity Provider y emite JWT (realm `nextlook`, importado al arrancar desde `docker/keycloak/nextlook-realm.json`). La seguridad tiene **dos líneas** (S07):
+
+1. **Gateway** (`nextlook-gateway`) valida firma y expiración del token y aplica las reglas por rol antes de enrutar.
+2. **Cada microservicio implementado** vuelve a validar el JWT como *resource server* y repite sus reglas, así un llamado directo a su puerto (sin pasar por el Gateway) tampoco entra.
+
+Los roles vienen en `realm_access.roles` y se convierten a `ROLE_CLIENTE` / `ROLE_ADMIN`.
 
 ```mermaid
 flowchart LR
-    Cliente(["Cliente"])
-    Keycloak["Keycloak - Identity Provider"]
-
-    Cliente -->|"1. login"| Keycloak
-    Keycloak -->|"2. emite JWT"| Cliente
-
-    subgraph MS["Microservicios (cada uno valida el JWT de forma independiente)"]
-        OrdenMS["orden-ms"]
-        CatalogoMS["catalogo-ms"]
-        InventarioMS["inventario-ms"]
-        ResenasMS["resenas-ms"]
-        PagoMS["pago-ms"]
-        ClienteMS["cliente-ms"]
-        EnvioMS["envio-ms"]
-        NotifMS["notificaciones-ms"]
-    end
-
-    Cliente -->|"3. request + JWT"| OrdenMS
-    Cliente -->|"3. request + JWT"| CatalogoMS
-    Cliente -->|"3. request + JWT"| InventarioMS
-    Cliente -->|"3. request + JWT"| ResenasMS
-    Cliente -->|"3. request + JWT"| PagoMS
-    Cliente -->|"3. request + JWT"| ClienteMS
-    Cliente -->|"3. request + JWT"| EnvioMS
-    Cliente -->|"3. request + JWT"| NotifMS
-
-    OrdenMS -.->|"4. valida JWT"| Keycloak
-    CatalogoMS -.->|"4. valida JWT"| Keycloak
-    InventarioMS -.->|"4. valida JWT"| Keycloak
-    ResenasMS -.->|"4. valida JWT"| Keycloak
-    PagoMS -.->|"4. valida JWT"| Keycloak
-    ClienteMS -.->|"4. valida JWT"| Keycloak
-    EnvioMS -.->|"4. valida JWT"| Keycloak
-    NotifMS -.->|"4. valida JWT"| Keycloak
+    C(["Comprador / Admin"]) -->|"1. login"| K["Keycloak :18443<br/>realm nextlook"]
+    K -->|"2. JWT"| C
+    C -->|"3. Bearer JWT"| G["Gateway :18080<br/>1ra línea"]
+    G --> CAT["catalogo-ms"] & CLI["cliente-ms"] & ORD["orden-ms"] & INV["inventario-ms"] & PAG["pago-ms"]
+    ORD -->|"Feign reenvía el mismo JWT"| CLI
+    G -.->|"JWKS"| K
+    CAT & CLI & ORD & INV & PAG -.->|"JWKS · 2da línea"| K
 ```
 
-## Roles
+## Realm `nextlook`
 
-| Rol | Puede |
+| Elemento | Valor |
 |---|---|
-| `CLIENTE` | Crear órdenes, gestionar su propio perfil, sus direcciones de envío y sus reseñas. |
-| `ADMIN` | Gestión global de catálogo, inventario, clientes y notificaciones. |
+| Cliente de la SPA | `nextlook-web` (público, Authorization Code + PKCE S256 obligatorio, **sin** password grant, redirect `http://localhost:4200/auth/callback`, web origin `http://localhost:4200`) — S11 |
+| Cliente de scripts | `nextlook-api` (público, solo password grant para los `.ps1` de prueba, sin redirect URIs) |
+| Claim propio | `talla_preferida` (user attribute + protocol mapper en ambos clientes) — S11 |
+| Duración del token | 15 min |
+| Usuarios de prueba | `cliente@nextlook.pe` / `cliente123` (CLIENTE), `cliente2@nextlook.pe` / `cliente123` (CLIENTE), `admin@nextlook.pe` / `admin123` (ADMIN) |
 
-## Protección por microservicio
+Obtener un token:
 
-| Microservicio | Rol que lo protege principalmente |
+```bash
+curl -s -X POST http://localhost:18443/realms/nextlook/protocol/openid-connect/token \
+  -d grant_type=password -d client_id=nextlook-api \
+  -d username=cliente@nextlook.pe -d password=cliente123
+```
+
+## Reglas por ruta (Gateway y microservicio)
+
+| Ruta | Regla |
 |---|---|
-| `orden-ms` | `CLIENTE` — crea y consulta sus propias órdenes. |
-| `catalogo-ms` | `ADMIN` — gestión global del catálogo. |
-| `inventario-ms` | `ADMIN` — gestión global de inventario. |
-| `resenas-ms` | `CLIENTE` — gestiona sus propias reseñas. |
-| `pago-ms` | `CLIENTE` — paga sus propias órdenes. |
-| `cliente-ms` | `CLIENTE` — gestiona su propio perfil y direcciones. |
-| `envio-ms` | `CLIENTE` (seguimiento de su envío) / `ADMIN` (gestión global). |
-| `notificaciones-ms` | `ADMIN` — gestión global de notificaciones. |
+| `GET /api/v1/productos/**`, `GET /api/v1/categorias/**` | pública |
+| resto de `/productos`, `/categorias` | `ADMIN` |
+| `/api/v1/inventario/**` | `ADMIN` |
+| `POST /api/v1/clientes`, `/api/v1/clientes/me/**` | `CLIENTE` |
+| resto de `/api/v1/clientes/**` | `ADMIN` |
+| `POST /api/v1/ordenes`, `/ordenes/mias`, `/ordenes/{id}/confirmar` | `CLIENTE` |
+| `GET /api/v1/ordenes` | `ADMIN` |
+| `GET /api/v1/ordenes/{id}` | `CLIENTE` dueño o `ADMIN` (dueño = `sub` del JWT, se valida en el servicio) |
+| `POST /api/v1/pagos/procesar` | `CLIENTE` dueño de la orden |
+| `GET /api/v1/pagos` | `ADMIN` |
+| `/actuator/**`, Swagger | público (solo red interna) |
 
-!!! warning "Datos pendientes de confirmar"
-    El brief no especifica el detalle de los endpoints protegidos por cada rol, ni si existe un componente de Gateway que centralice la validación. Cuando el equipo lo defina, completar la sección "Endpoints" de cada microservicio con la protección exacta por ruta.
+Sin token → **401**; token válido pero rol incorrecto o recurso ajeno → **403**.
+
+`resenas-ms`, `envio-ms` y `notificaciones-ms` todavía no tienen endpoints, pero **ya validan el JWT** como el resto (sin token → 401). Verificación de los 8 servicios por su puerto directo: `pwsh scripts/prueba-seguridad.ps1`.

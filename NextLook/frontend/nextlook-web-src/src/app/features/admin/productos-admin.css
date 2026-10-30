@@ -1,0 +1,57 @@
+.titulo { font-size: clamp(2.6rem, 6vw, 4.4rem); margin-top: 0.3rem; }
+.aviso { margin-bottom: 1.2rem; align-items: center; }
+
+/* ---------- alta ---------- */
+.alta { margin-bottom: 2.4rem; padding: 1.8rem; }
+.alta-cabecera { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.4rem; }
+.alta-cuerpo { display: grid; grid-template-columns: 300px 1fr; gap: 2rem; align-items: start; }
+.zona-foto {
+  position: relative; aspect-ratio: 4 / 5; border: 2px dashed var(--linea-fuerte); border-radius: var(--radio-lg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; text-align: center;
+  background: var(--papel); cursor: pointer; overflow: hidden; color: var(--suave); padding: 1rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+.zona-foto:hover { border-color: var(--tinta); background: var(--hueso); }
+.zona-foto strong { color: var(--tinta); }
+.zona-foto small { font-size: 0.78rem; }
+.zona-foto.con-foto { padding: 0; border-style: solid; }
+.zona-foto img { width: 100%; height: 100%; object-fit: cover; }
+.cambiar {
+  position: absolute; bottom: 0.8rem; left: 50%; transform: translateX(-50%);
+  background: var(--tinta); color: white; padding: 0.4rem 0.9rem; border-radius: 999px;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.campo.completo { grid-column: 1 / -1; }
+.nueva-cat span { font-size: 0.78rem; font-weight: 600; }
+.en-linea { display: flex; gap: 0.4rem; }
+.en-linea button { min-height: 46px; }
+.sub { font-family: var(--texto); text-transform: none; font-size: 1rem; font-weight: 700; margin: 1.8rem 0 0.8rem; }
+.variantes { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; }
+.fila { display: grid; grid-template-columns: 1fr 1.4fr 1fr 44px; gap: 0.5rem; width: 100%; }
+.fila.cabeza span { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--suave); }
+.fila .texto { min-height: 46px; color: var(--suave); text-decoration: none; }
+.fila .texto:hover { color: var(--mal); }
+.alta-acciones { display: flex; justify-content: flex-end; margin-top: 1.6rem; padding-top: 1.2rem; border-top: 1px solid var(--linea); }
+
+/* ---------- listado ---------- */
+.barra-lista { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.barra-lista p { margin: 0; }
+.buscar { max-width: 340px; }
+.prenda-celda { display: flex; gap: 0.8rem; align-items: center; min-width: 220px; }
+.prenda-celda div:last-child { display: flex; flex-direction: column; }
+.prenda-celda .muted { font-size: 0.78rem; }
+.mini {
+  width: 48px; flex: none; aspect-ratio: 4 / 5; border-radius: var(--radio); overflow: hidden;
+  background: var(--hueso); display: grid; place-items: center; color: var(--linea-fuerte);
+}
+.mini img { width: 100%; height: 100%; object-fit: cover; }
+.variantes-celda { max-width: 280px; }
+.variantes-celda .chip { margin: 0 0.25rem 0.25rem 0; text-transform: none; letter-spacing: 0; font-weight: 600; }
+.acciones-celda { white-space: nowrap; text-align: right; }
+.acciones-celda .btn, .acciones-celda button { margin-left: 0.3rem; }
+.ocupado { pointer-events: none; opacity: 0.6; }
+
+@media (max-width: 820px) {
+  .alta-cuerpo { grid-template-columns: 1fr; }
+  .zona-foto { max-width: 280px; }
+}

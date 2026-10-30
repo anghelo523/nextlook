@@ -1,0 +1,35 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  maven:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        modulo:
+          - infra/nextlook-config
+          - infra/nextlook-eureka
+          - infra/nextlook-gateway
+          - services/catalogo-ms
+          - services/cliente-ms
+          - services/orden-ms
+          - services/inventario-ms
+          - services/pago-ms
+          - services/resenas-ms
+          - services/envio-ms
+          - services/notificaciones-ms
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Compilar ${{ matrix.modulo }}
+        working-directory: ${{ matrix.modulo }}
+        run: |
+          if [ -x ./mvnw ]; then ./mvnw -B -ntp -DskipTests package; else mvn -B -ntp -DskipTests package; fi

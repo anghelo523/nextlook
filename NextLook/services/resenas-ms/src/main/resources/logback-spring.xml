@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  S10 - Logs de resenas-ms a consola Y a archivo.
+  * Dentro de Docker, Promtail lee la consola del contenedor (docker_sd_configs).
+  * Corriendo con "mvn spring-boot:run", Promtail lee logs/resenas-ms.log de esta carpeta.
+  [%X{traceId:-}] es el identificador de correlacion que pone CorrelationIdFilter (HTTP)
+  o TraceKafka (eventos): el mismo valor en todos los servicios que tocan la misma compra.
+-->
+<configuration>
+    <springProperty scope="context" name="APP" source="spring.application.name" defaultValue="resenas-ms"/>
+    <property name="LOG_DIR" value="${LOG_DIR:-logs}"/>
+    <property name="LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [${APP}] [%X{traceId:-}] [%thread] %logger{36} - %msg%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/resenas-ms.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/resenas-ms-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>
