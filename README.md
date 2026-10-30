@@ -1,23 +1,106 @@
 # NextLook
 
-E-commerce de moda basado en microservicios. Ver [docs/index.md](docs/index.md) para la arquitectura completa (diagramas C4, flujo de dominio, seguridad, comunicación entre servicios).
+E-commerce de moda basado en **microservicios** — Proyecto Sello del curso de Sistemas Distribuidos.
+
+Una tienda de ropa donde el cliente inicia sesión, elige prendas por talla y color, las paga con Tarjeta, Yape o Plin y sigue su pedido en «Mis pedidos». Por detrás, 8 microservicios Spring Boot se comunican por REST (con resiliencia) y por eventos Kafka (Saga coreografiada), protegidos con Keycloak y observados con Prometheus, Loki y Grafana.
+
+> **Estado actual: cierre de la Unidad II (S06–S11).** Toda la documentación (arquitectura C4, seguridad, comunicación, consistencia, fichas de cada microservicio) está en [`NextLook/docs/`](NextLook/docs/index.md). Producto de la unidad y guion de la demo S12: [`NextLook/docs/u2-producto.md`](NextLook/docs/u2-producto.md).
+
+---
+
+## Contenido
+
+- [Qué avanzamos](#qué-avanzamos)
+- [Estado por componente](#estado-por-componente)
+- [Estructura del repositorio](#estructura-del-repositorio)
+- [Arranque rápido](#arranque-rápido)
+- [Scripts de demo y verificación](#scripts-de-demo-y-verificación)
+- [Arquitectura](#arquitectura)
+- [Saga de compra](#saga-de-compra)
+- [Modelo de datos](#modelo-de-datos)
+- [Roadmap](#roadmap)
+- [Límites conocidos](#límites-conocidos)
+- [Equipo](#equipo)
+
+---
+
+## Qué avanzamos
+
+### Unidad I — Base distribuida
+
+- Config Server, Eureka y Gateway funcionando, con configuración por ambiente (`dev` / `prod`).
+- Una base Postgres por microservicio y los 8 microservicios registrados en Eureka.
+- Documentación de arquitectura servida con MkDocs.
+
+### Unidad II — Sistema seguro, resiliente, consistente y observable
+
+| Sesión | Capacidad | Cómo está en NextLook |
+|---|---|---|
+| **S06** – Comunicación síncrona resiliente | OpenFeign + Resilience4j | `orden-ms` llama a `cliente-ms` (perfil + dirección) y `catalogo-ms` (precio, talla, color) con timeout (2 s / 3 s), 3 reintentos con *backoff* y Circuit Breaker. Si fallan, la orden queda en `CARRITO` (HTTP 202) y se confirma después con `POST /ordenes/{id}/confirmar`. |
+| **S07** – Seguridad distribuida | Keycloak + JWT | Realm `nextlook` importado automáticamente, roles `CLIENTE` / `ADMIN`. El Gateway **y cada uno de los 8 microservicios** validan el JWT (*resource server*); Feign reenvía el token; un cliente solo ve sus propias órdenes y pagos (control de dueño por `sub`). |
+| **S08** – Mensajería asíncrona | Kafka 4 (KRaft) | Eventos `orden.creada`, `orden.cancelada`, `stock.reservado` / `stock.rechazado`, `pago.aprobado` / `pago.rechazado`, publicados *after-commit* con key `ordenId` en los topics `orden-eventos`, `inventario-eventos` y `pago-eventos`. Kafka UI incluido. |
+| **S09** – Consistencia distribuida | Saga coreografiada | Orden → stock → pago, con compensaciones (liberar stock, cancelar orden, anular pago) y consumidores idempotentes (consulta previa + restricción `UNIQUE`). |
+| **S10** – Observabilidad | Prometheus + Loki + Grafana | *Health groups* liveness / readiness, logs con `traceId` en Loki vía Promtail, `X-Trace-ID` propagado por Gateway, Feign y Kafka, y el tablero **NextLook - Diagnostico** en Grafana. |
+| **S11** – Cliente frontend | SPA Angular 22 | Login *Authorization Code* + PKCE contra Keycloak (`nextlook-web`), consumo de la API **solo** por el Gateway (CORS), rutas protegidas por rol, bolsa, perfil y «Mis pedidos» con *polling*. |
+
+**La tienda (SPA):**
+
+- Catálogo de **22 prendas** con foto de referencia; solo `ADMIN` publica, cambia fotos o retira prendas.
+- Pago paso a paso con **Tarjeta, Yape o Plin**.
+- Opción «ya no quiero este pedido» con confirmación: dispara `orden.cancelada`, inventario libera las prendas y pago anula el cobro.
+- Rediseño completo con estilo urbano y editorial.
+- Panel de administración de productos y de pagos.
+
+**Extras:** workflow de build en GitHub Actions (`.github/workflows/build.yml`) y un nombre de proyecto Compose único (`nextlook-dev`) para los tres archivos compose.
+
+---
+
+## Estado por componente
+
+| Componente | Estado | Detalle |
+|---|---|---|
+| Config Server (`nextlook-config`) | ✅ | Sirve la configuración desde `infra/config-repo` y `services/*/config`. |
+| Eureka (`nextlook-eureka`) | ✅ | `orden-ms` resuelve `cliente-ms` y `catalogo-ms` por nombre. |
+| Gateway (`nextlook-gateway`) | ✅ | Rutas `/api/v1/**`, validación JWT y reglas por rol (1ra línea de defensa). |
+| `catalogo-ms` | ✅ | Categorías, prendas, variantes talla/color, fotos y datos semilla (Flyway). |
+| `cliente-ms` | ✅ | Perfil ligado al JWT (`keycloak_id`) + direcciones de envío. |
+| `orden-ms` | ✅ | Feign + Circuit Breaker, inicio de la Saga, cancelación por el cliente. |
+| `inventario-ms` | ✅ | Reserva todo-o-nada idempotente, confirmación y compensación. |
+| `pago-ms` | 🟡 | Flujo de eventos completo con **pasarela simulada**; falta Mercado Pago Sandbox real. |
+| `resenas-ms`, `envio-ms`, `notificaciones-ms` | 🟡 | Esqueletos protegidos con JWT (401/403); su lógica de negocio llega en U3. |
+| Seguridad (Keycloak / JWT) | ✅ | Dos líneas de defensa: Gateway + cada microservicio. TLS real pendiente. |
+| Mensajería (Kafka) | ✅ | 3 topics + Kafka UI. |
+| Consistencia (Saga) | ✅ | Compensación e idempotencia verificadas con scripts. |
+| Observabilidad | ✅ | Prometheus, Loki/Promtail, Grafana con tablero de diagnóstico. |
+| Cliente web (Angular) | ✅ | PKCE, catálogo, bolsa, perfil, pago y «Mis pedidos». |
+
+Detalle completo: [`NextLook/docs/avance.md`](NextLook/docs/avance.md).
+
+---
 
 ## Estructura del repositorio
 
-```
+```text
 NextLook/
-├── docker/     # Orquestación local de toda la infraestructura (docker-compose)
-├── docs/       # Documentación de arquitectura (servida con MkDocs)
-├── infra/      # Piezas de infraestructura compartida: Config Server, Eureka, Gateway
-├── obs/        # Observabilidad (Grafana, Prometheus, Promtail) y overrides de despliegue
-└── services/   # Los 8 microservicios de negocio, cada uno con su propio código y config
+├── .github/    # Workflow de build (GitHub Actions)
+├── docker/     # docker-compose de la infraestructura + realm de Keycloak
+├── docs/       # Documentación de arquitectura (MkDocs)
+├── frontend/   # SPA Angular 22: login PKCE, catálogo, bolsa, pago, «Mis pedidos», admin
+├── infra/      # Config Server, Eureka y Gateway
+├── obs/        # Observabilidad: Prometheus, Loki, Promtail, Grafana
+├── scripts/    # Scripts PowerShell de demo y verificación (Saga, seguridad, resiliencia…)
+└── services/   # Los 8 microservicios de negocio
 ```
 
 Cada carpeta principal tiene su propio `README.md` con el detalle de qué contiene y cómo se usa.
 
-## Arranque rápido (entorno de desarrollo)
+---
 
-```
+## Arranque rápido
+
+Desde la carpeta `NextLook/`:
+
+```bash
 docker compose \
   -f docker/docker-compose.infra.yml \
   -f services/compose-dev.yml \
@@ -25,266 +108,280 @@ docker compose \
   up -d --build
 ```
 
-Levanta el Config Server, Eureka, el Gateway, una base Postgres por microservicio, Keycloak, los 8 microservicios (como esqueleto bootable, ver [Estado de avance](docs/avance.md)) y Prometheus.
+Levanta Config Server, Eureka, Gateway, Keycloak (realm `nextlook` ya importado), Kafka + Kafka UI, una base Postgres por microservicio, los 8 microservicios y la observabilidad.
+
+Para la tienda:
+
+```bash
+cd frontend
+pwsh ./crear-frontend.ps1
+cd nextlook-web
+npm start
+```
 
 | Servicio | URL |
 |---|---|
+| **Tienda (SPA Angular)** | http://localhost:4200 |
 | Gateway | http://localhost:18080 |
 | Eureka | http://localhost:18761 |
 | Config Server | http://localhost:18888 |
+| Keycloak | http://localhost:18443 (realm `nextlook`) |
+| Kafka UI | http://localhost:18085 |
 | Prometheus | http://localhost:19090/targets |
-| catalogo-ms / inventario-ms / resenas-ms / orden-ms / pago-ms / cliente-ms / envio-ms / notificaciones-ms | 8081-8088 |
+| Grafana | http://localhost:13000 (admin / admin) |
+| catalogo-ms · inventario-ms · resenas-ms · orden-ms · pago-ms · cliente-ms · envio-ms · notificaciones-ms | 8081 → 8088 |
 
-También se puede levantar solo la infra (sin microservicios) con `docker compose -f docker/docker-compose.infra.yml up -d`, y correr un microservicio suelto localmente con `mvn spring-boot:run` apuntando a esa infra ya dockerizada.
+Cada microservicio expone `/actuator/health` y `/swagger-ui.html`.
 
-> **Desde el navegador, siempre `localhost`, nunca el nombre del contenedor.** `http://orden-ms:8084/...` solo resuelve *dentro* de la red de Docker (por eso Eureka y Prometheus lo usan entre ellos); desde tu PC es `http://localhost:8084/...`.
+**Usuarios de prueba:** `cliente@nextlook.pe` / `cliente123` (CLIENTE) y `admin@nextlook.pe` / `admin123` (ADMIN).
 
-## Documentación
+> **Desde el navegador, siempre `localhost`, nunca el nombre del contenedor.** `http://orden-ms:8084/...` solo resuelve *dentro* de la red de Docker; desde tu PC es `http://localhost:8084/...`.
 
-```
+**Documentación con MkDocs** (desde `NextLook/`):
+
+```bash
 docker run --rm -it -p 8000:8000 -v "${PWD}:/docs" squidfunk/mkdocs-material
 ```
 
-Sirve la documentación completa (arquitectura, seguridad, cada microservicio, estado de avance) en http://localhost:8000.
+Abre http://localhost:8000.
 
-## Identidades y relaciones
+---
 
-Vista técnica actual (complementa el [C4 de dominio](docs/arquitectura.md), que todavía no dibuja Gateway/Eureka/Config Server por estar "pendientes de confirmar" en el brief — acá ya son reales):
+## Scripts de demo y verificación
+
+Todos en `NextLook/scripts/` (PowerShell 5+ o 7), con el stack levantado:
+
+| Script | Qué demuestra |
+|---|---|
+| `prueba-saga.ps1` | Compra pagada (`APRO`), pago rechazado (`FUND`, con compensación de stock) y orden sin stock, entre otros casos. |
+| `prueba-seguridad.ps1` | Llama directo a los 8 puertos: sin token → 401, CLIENTE en ruta de ADMIN → 403, rol correcto → 2xx. |
+| `prueba-resiliencia.ps1` | Caída de `catalogo-ms`: reintentos, circuito abierto, orden en `CARRITO` y recuperación. |
+| `prueba-idempotencia.ps1` | Reenvía 3 veces el mismo `orden.creada`: stock, reservas y pagos no cambian. |
+| `simular-falla.ps1` | Caída de `inventario-ms`: la orden espera en Kafka y se completa sola; seguimiento por `traceId` en Grafana. |
+| `readiness-sin-base.ps1` | Readiness cae a `DOWN` cuando el servicio pierde su base de datos. |
+| `verificar-s11.ps1` | Verificación del cliente frontend (PKCE, CORS, token con `talla_preferida`). |
+
+---
+
+## Arquitectura
 
 ```mermaid
-flowchart TB
-    Cliente(["Cliente"])
-    Keycloak["Keycloak<br/>(Identity Provider)"]
-    Gateway["nextlook-gateway<br/>:18080"]
-    Eureka["nextlook-eureka<br/>:18761"]
-    Config["nextlook-config<br/>:18888"]
-    MercadoPago["Mercado Pago<br/>(Sandbox)"]
-
-    Cliente -->|"1. login"| Keycloak
-    Cliente -->|"2. request + JWT"| Gateway
-    Gateway -->|"3. resuelve destino"| Eureka
-
-    subgraph IdentidadCliente["Identidad y Cliente"]
-        ClienteMS["cliente-ms :8086"]
-        ClienteDB[("cliente_db")]
-        ClienteMS --> ClienteDB
-    end
-
-    subgraph CatalogoInventario["Catálogo e Inventario"]
-        CatalogoMS["catalogo-ms :8081"]
-        CatalogoDB[("catalogo_db")]
-        InventarioMS["inventario-ms :8082"]
-        InventarioDB[("inventario_db")]
-        ResenasMS["resenas-ms :8083"]
-        ResenasDB[("resenas_db")]
-        CatalogoMS --> CatalogoDB
-        InventarioMS --> InventarioDB
-        ResenasMS --> ResenasDB
-    end
-
-    subgraph OrdenPago["Órdenes y Pago"]
-        OrdenMS["orden-ms :8084"]
-        OrdenDB[("orden_db")]
-        PagoMS["pago-ms :8085"]
-        PagoDB[("pago_db")]
-        OrdenMS --> OrdenDB
-        PagoMS --> PagoDB
-    end
-
-    subgraph EnvioNotif["Envío y Notificaciones"]
-        EnvioMS["envio-ms :8087"]
-        EnvioDB[("envio_db")]
-        NotifMS["notificaciones-ms :8088"]
-        NotifDB[("notificaciones_db")]
-        EnvioMS --> EnvioDB
-        NotifMS --> NotifDB
-    end
-
-    Gateway -->|"/api/v1/**"| ClienteMS
-    Gateway -->|"/api/v1/**"| CatalogoMS
-    Gateway -->|"/api/v1/**"| InventarioMS
-    Gateway -->|"/api/v1/**"| ResenasMS
-    Gateway -->|"/api/v1/**"| OrdenMS
-    Gateway -->|"/api/v1/**"| PagoMS
-    Gateway -->|"/api/v1/**"| EnvioMS
-    Gateway -->|"/api/v1/**"| NotifMS
-
-    ClienteMS -.->|"registro / config"| Eureka
-    CatalogoMS -.->|"registro / config"| Eureka
-    InventarioMS -.->|"registro / config"| Eureka
-    ResenasMS -.->|"registro / config"| Eureka
-    OrdenMS -.->|"registro / config"| Eureka
-    PagoMS -.->|"registro / config"| Eureka
-    EnvioMS -.->|"registro / config"| Eureka
-    NotifMS -.->|"registro / config"| Eureka
-    Eureka -.-> Config
-
-    OrdenMS -->|"REST: valida cliente"| ClienteMS
-    EnvioMS -->|"REST: obtiene dirección"| ClienteMS
-    ResenasMS -->|"REST: valida producto"| CatalogoMS
-    ResenasMS -->|"REST: valida compra"| ClienteMS
-    PagoMS -->|"REST"| MercadoPago
-
-    OrdenMS -.->|"evento: Orden Creada"| InventarioMS
-    PagoMS -.->|"evento: resultado pago"| OrdenMS
-    PagoMS -.->|"evento: resultado pago"| InventarioMS
-    OrdenMS -.->|"evento: Pago Aprobado"| EnvioMS
-    OrdenMS -.->|"evento"| NotifMS
-    PagoMS -.->|"evento"| NotifMS
-    InventarioMS -.->|"evento"| NotifMS
-    EnvioMS -.->|"evento"| NotifMS
+flowchart LR
+    U(["Comprador<br/>SPA Angular :4200"]) -->|"JWT (PKCE)"| GW["Gateway :18080"]
+    KC["Keycloak :18443"] -.JWKS.-> GW
+    GW --> CAT["catalogo-ms :8081"]
+    GW --> INV["inventario-ms :8082"]
+    GW --> RES["resenas-ms :8083"]
+    GW --> ORD["orden-ms :8084"]
+    GW --> PAG["pago-ms :8085"]
+    GW --> CLI["cliente-ms :8086"]
+    GW --> ENV["envio-ms :8087"]
+    GW --> NOT["notificaciones-ms :8088"]
+    ORD -- "Feign + Circuit Breaker" --> CLI
+    ORD -- "Feign + Circuit Breaker" --> CAT
+    ORD == "orden.creada / orden.cancelada" ==> K[("Kafka :19092")]
+    K ==> INV
+    K ==> PAG
+    INV == "stock.*" ==> K
+    PAG == "pago.*" ==> K
+    K == "stock.* / pago.*" ==> ORD
 
     classDef infra fill:#eef6ff,stroke:#2b6cb0,stroke-width:2px,color:#111;
     classDef external fill:#fff3cd,stroke:#b7791f,stroke-width:2px,color:#5f370e;
-    class Gateway,Eureka,Config infra;
-    class Keycloak,MercadoPago external;
+    classDef skeleton fill:#eef0f2,stroke:#8a94a3,stroke-width:2px,stroke-dasharray: 4 3,color:#333;
+    class GW,K infra;
+    class KC external;
+    class RES,ENV,NOT skeleton;
 ```
 
-Flechas continuas = síncrono (REST) o ruteo; flechas punteadas = eventos asíncronos (todavía sin tecnología de mensajería elegida, ver [Comunicación](docs/comunicacion.md)) y registro/descubrimiento en Eureka.
+Flechas simples = REST por el Gateway; flechas gruesas = eventos Kafka. Los servicios con borde punteado son esqueletos protegidos (U3). Todos se registran en Eureka y leen su configuración del Config Server.
 
-## Modelo entidad-relación
+Más detalle: [Comunicación](NextLook/docs/comunicacion.md) · [Seguridad](NextLook/docs/seguridad.md) · [Observabilidad](NextLook/docs/observabilidad.md) · [Cliente web](NextLook/docs/frontend.md).
 
-> ⚠️ **Propuesta, no un modelo confirmado.** Ningún microservicio tiene entidades implementadas todavía (la sección "Entidades" de cada [ficha en docs/microservicios](docs/microservicios/orden-ms.md) sigue en TODO). Este diagrama es un punto de partida razonable a partir de lo que el [brief](docs/brief.md) sí describe (qué administra cada servicio), para que el equipo lo discuta y ajuste, no un esquema ya acordado.
+---
 
-Cada microservicio es dueño de su propia base — no hay FK real entre servicios (líneas punteadas abajo = referencia lógica por id, resuelta por REST/eventos, no por JOIN):
+## Saga de compra
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant SPA as SPA
+    participant ORD as orden-ms
+    participant K as Kafka
+    participant INV as inventario-ms
+    participant PAG as pago-ms
+
+    SPA->>ORD: POST /ordenes (JWT)
+    ORD->>ORD: valida cliente y prendas (Feign + CB)
+    ORD-->>K: orden.creada (PENDIENTE_STOCK)
+    K-->>INV: orden.creada
+    alt hay stock
+        INV-->>K: stock.reservado
+        K-->>ORD: PENDIENTE_PAGO
+        SPA->>PAG: pagar (Tarjeta / Yape / Plin)
+        alt pago aprobado
+            PAG-->>K: pago.aprobado
+            K-->>ORD: PAGADA
+            K-->>INV: confirma reserva
+        else pago rechazado
+            PAG-->>K: pago.rechazado
+            K-->>ORD: CANCELADA
+            K-->>INV: libera stock (compensación)
+        end
+    else sin stock
+        INV-->>K: stock.rechazado
+        K-->>ORD: CANCELADA (SIN_STOCK)
+    end
+```
+
+Si el cliente cancela («ya no quiero este pedido»), `orden.cancelada` hace que inventario libere las prendas y pago anule el cobro. Detalle en [Consistencia de datos](NextLook/docs/consistencia.md).
+
+---
+
+## Modelo de datos
+
+Implementado con Flyway en los 5 microservicios con lógica de negocio. Cada servicio es dueño de su propia base: no hay FK entre servicios (las referencias cruzadas son ids lógicos resueltos por REST o eventos).
 
 ```mermaid
 erDiagram
-    CLIENTE ||--o{ DIRECCION : tiene
-    CLIENTE {
-        uuid id PK
-        string nombre
-        string email
-        string rol
+    CATEGORIAS ||--o{ PRENDAS : agrupa
+    PRENDAS ||--o{ VARIANTES : tiene
+    CATEGORIAS {
+        bigint id PK
+        varchar nombre
     }
-    DIRECCION {
-        uuid id PK
-        uuid cliente_id FK
-        string calle
-        string ciudad
-        boolean predeterminada
+    PRENDAS {
+        bigint id PK
+        bigint id_categoria FK
+        varchar nombre
+        varchar marca
+        varchar genero
+        numeric precio
+        boolean activo
     }
-
-    CATEGORIA ||--o{ PRODUCTO : agrupa
-    PRODUCTO ||--o{ VARIANTE : tiene
-    CATEGORIA {
-        uuid id PK
-        string nombre
-    }
-    PRODUCTO {
-        uuid id PK
-        uuid categoria_id FK
-        string nombre
-        string descripcion
-        decimal precio_base
-    }
-    VARIANTE {
-        uuid id PK
-        uuid producto_id FK
-        string talla
-        string color
-        string sku
+    VARIANTES {
+        bigint id PK
+        bigint id_prenda FK
+        varchar talla
+        varchar color
+        varchar sku
     }
 
-    VARIANTE ||--o| STOCK : "referencia (otro servicio)"
-    STOCK ||--o{ RESERVA_STOCK : tiene
-    STOCK {
-        uuid id PK
-        uuid variante_id "ref. catalogo-ms"
-        int cantidad_disponible
+    CLIENTES ||--o{ DIRECCIONES : tiene
+    CLIENTES {
+        bigint id PK
+        varchar keycloak_id
+        varchar nombres
+        varchar apellidos
+        varchar email
+        varchar dni
+    }
+    DIRECCIONES {
+        bigint id PK
+        bigint id_cliente FK
+        varchar alias
+        varchar direccion
+        varchar distrito
+        boolean principal
+    }
+
+    ORDENES ||--o{ ORDEN_ITEMS : tiene
+    ORDENES {
+        bigint id PK
+        varchar keycloak_id
+        bigint id_cliente "ref. cliente-ms"
+        varchar estado "CARRITO..CANCELADA"
+        varchar metodo_pago "TARJETA/YAPE/PLIN"
+        numeric total
+    }
+    ORDEN_ITEMS {
+        bigint id PK
+        bigint id_orden FK
+        bigint variante_id "ref. catalogo-ms"
+        int cantidad
+        numeric precio_unitario
+    }
+
+    STOCK_VARIANTE ||--o{ RESERVA_STOCK : tiene
+    STOCK_VARIANTE {
+        bigint variante_id PK "ref. catalogo-ms"
+        varchar sku
+        int disponible
+        int reservado
     }
     RESERVA_STOCK {
-        uuid id PK
-        uuid stock_id FK
-        uuid orden_id "ref. orden-ms"
+        bigint id PK
+        bigint orden_id "ref. orden-ms"
+        bigint variante_id FK
         int cantidad
-        string estado
+        varchar estado "RESERVADA/CONFIRMADA/LIBERADA"
+    }
+    ORDEN_PROCESADA {
+        bigint id PK
+        bigint orden_id "UNIQUE, idempotencia"
+        varchar resultado
     }
 
-    PRODUCTO ||--o{ RESENA : "referencia (otro servicio)"
-    CLIENTE ||--o{ RESENA : "referencia (otro servicio)"
-    RESENA {
-        uuid id PK
-        uuid producto_id "ref. catalogo-ms"
-        uuid cliente_id "ref. cliente-ms"
-        int calificacion
-        string comentario
-    }
-
-    CLIENTE ||--o{ ORDEN : "referencia (otro servicio)"
-    ORDEN ||--o{ ITEM_ORDEN : tiene
-    ORDEN {
-        uuid id PK
-        uuid cliente_id "ref. cliente-ms"
-        string estado
-        decimal total
-        datetime fecha
-    }
-    ITEM_ORDEN {
-        uuid id PK
-        uuid orden_id FK
-        uuid variante_id "ref. catalogo-ms"
-        int cantidad
-        decimal precio_unitario
-    }
-
-    ORDEN ||--o| PAGO : "referencia (otro servicio)"
-    PAGO {
-        uuid id PK
-        uuid orden_id "ref. orden-ms"
-        decimal monto
-        string estado
-        string mercado_pago_id
-    }
-
-    ORDEN ||--o| ENVIO : "referencia (otro servicio)"
-    DIRECCION ||--o{ ENVIO : "referencia (otro servicio)"
-    ENVIO {
-        uuid id PK
-        uuid orden_id "ref. orden-ms"
-        uuid direccion_id "ref. cliente-ms"
-        string estado
-        datetime fecha_envio
-    }
-
-    CLIENTE ||--o{ NOTIFICACION : "referencia (otro servicio)"
-    NOTIFICACION {
-        uuid id PK
-        uuid cliente_id "ref. cliente-ms"
-        string tipo
-        string mensaje
-        boolean leido
+    PAGOS {
+        bigint id PK
+        bigint orden_id "UNIQUE, ref. orden-ms"
+        numeric monto
+        varchar metodo_pago
+        varchar estado "PENDIENTE..ANULADO"
+        varchar id_transaccion
     }
 ```
+
+---
 
 ## Roadmap
 
 ```mermaid
 flowchart TD
     F0["Fase 0 — Infra base ✅<br/>Config Server, Eureka, Gateway,<br/>Postgres x8, Keycloak, Prometheus"]
-    F1["Fase 1 — Núcleo del dominio 🟡<br/>catalogo-ms + orden-ms"]
-    F2["Fase 2 — Resto de microservicios 🟡<br/>cliente, envio, inventario,<br/>notificaciones, pago, resenas"]
-    F3["Fase 3 — Seguridad ⬜<br/>JWT por microservicio + TLS Keycloak"]
-    F4["Fase 4 (propuesta) 🟣<br/>Mensajería asíncrona"]
-    F5["Fase 5 — Integración de pago ⬜<br/>Mercado Pago Sandbox"]
-    F6["Fase 6 (propuesta) 🟣<br/>Observabilidad completa"]
-    F7["Fase 7 — Stack completo ⬜<br/>infra + microservicios + Kafka + observabilidad"]
+    F1["Fase 1 — Núcleo del dominio ✅<br/>catalogo-ms + orden-ms"]
+    F2["Fase 2 — Resto de microservicios 🟡<br/>cliente, inventario, pago listos;<br/>faltan resenas, envio, notificaciones"]
+    F3["Fase 3 — Seguridad ✅<br/>JWT en Gateway + cada microservicio"]
+    F4["Fase 4 — Mensajería asíncrona ✅<br/>Kafka + Saga de compra"]
+    F5["Fase 5 — Integración de pago 🟡<br/>pasarela simulada → Mercado Pago Sandbox"]
+    F6["Fase 6 — Observabilidad ✅<br/>Grafana + Loki + Promtail"]
+    F7["Fase 7 — Stack completo ⬜<br/>un solo compose de producción + TLS"]
 
     F0 --> F1 --> F2 --> F3 --> F4 --> F5 --> F6 --> F7
 
     classDef done fill:#d4f4dd,stroke:#2f9e57,stroke-width:2px,color:#0b3d1f;
     classDef progress fill:#fff3cd,stroke:#b7791f,stroke-width:2px,color:#5f370e;
     classDef pending fill:#eef0f2,stroke:#8a94a3,stroke-width:2px,color:#333;
-    classDef proposed fill:#e6e6fa,stroke:#6a5acd,stroke-width:2px,stroke-dasharray: 4 3,color:#2e2e5c;
 
-    class F0 done;
-    class F1,F2 progress;
-    class F3,F5,F7 pending;
-    class F4,F6 proposed;
+    class F0,F1,F3,F4,F6 done;
+    class F2,F5 progress;
+    class F7 pending;
 ```
 
-Fases 1, 2, 3, 5, 7 confirmadas (vienen de comentarios ya presentes en `services/*/config/*.yml`); 4 y 6 son propuesta a confirmar con el equipo. Detalle completo, con lo que falta en cada una: [docs/avance.md](docs/avance.md).
+**Siguiente (Unidad III):** lógica de `resenas-ms`, `envio-ms` y `notificaciones-ms`; Mercado Pago Sandbox real; TLS en Keycloak; un único compose de producción.
+
+---
+
+## Límites conocidos
+
+- `pago-ms` usa una **pasarela simulada** (convención de titulares de Mercado Pago Sandbox: `APRO`, `FUND`…); la API real se conecta implementando `PasarelaPago`.
+- `resenas-ms`, `envio-ms` y `notificaciones-ms` solo validan JWT; su lógica llega en U3.
+- «Mis pedidos» usa *polling*; SSE / WebSocket queda como mejora.
+- Keycloak corre en `start-dev` (HTTP); TLS real es parte de la fase de producción.
+
+### Trabajo en otras ramas
+
+- **`avance-emer`** (Johan): avance de S07 sobre la plantilla del curso, con un `auth-ms` propio (login y registro de usuarios con JWT RS256, JWKS y el Gateway como Resource Server). Todavía no está integrado en `main`.
+
+---
 
 ## Equipo
 
-Anghelo, Yeins, Daniel, Johan — Docente: Abel Angel Sullon Macalupu.
+| Integrante | Microservicios | Aporte en U2 |
+|---|---|---|
+| Anghelo | `catalogo-ms`, `orden-ms` | Catálogo de prendas y variantes; órdenes con Feign + Retry + Circuit Breaker; inicio de la Saga. |
+| Yeins | `inventario-ms`, `resenas-ms` | Reserva de stock todo-o-nada, idempotencia y compensación; `resenas-ms` protegido. |
+| Daniel | `cliente-ms`, `pago-ms` | Perfil por `sub` y direcciones; pagos con pasarela simulada, idempotencia y eventos de resultado. |
+| Johan | `envio-ms`, `notificaciones-ms` | Esqueletos protegidos con JWT (se completan en U3); avance de autenticación en `avance-emer`. |
+
+**Docente:** Abel Angel Sullon Macalupu — Curso de Sistemas Distribuidos.
