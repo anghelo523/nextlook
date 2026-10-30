@@ -8,6 +8,7 @@ E-commerce de moda basado en microservicios. Ver [docs/index.md](docs/index.md) 
 NextLook/
 ├── docker/     # Orquestación local de toda la infraestructura (docker-compose)
 ├── docs/       # Documentación de arquitectura (servida con MkDocs)
+├── frontend/   # SPA Angular 22 (S11): login PKCE con Keycloak, catálogo, bolsa y Mis pedidos
 ├── infra/      # Piezas de infraestructura compartida: Config Server, Eureka, Gateway
 ├── obs/        # Observabilidad (Grafana, Prometheus, Promtail) y overrides de despliegue
 └── services/   # Los 8 microservicios de negocio, cada uno con su propio código y config
@@ -25,7 +26,7 @@ docker compose \
   up -d --build
 ```
 
-Levanta el Config Server, Eureka, el Gateway, una base Postgres por microservicio, Keycloak, los 8 microservicios (como esqueleto bootable, ver [Estado de avance](docs/avance.md)) y Prometheus.
+Levanta el Config Server, Eureka, el Gateway (con validación JWT), una base Postgres por microservicio, Keycloak (realm `nextlook` importado), Kafka + Kafka UI, los 8 microservicios y Prometheus. Estado de cada uno en [Estado de avance](docs/avance.md).
 
 | Servicio | URL |
 |---|---|
@@ -33,6 +34,9 @@ Levanta el Config Server, Eureka, el Gateway, una base Postgres por microservici
 | Eureka | http://localhost:18761 |
 | Config Server | http://localhost:18888 |
 | Prometheus | http://localhost:19090/targets |
+| Grafana | http://localhost:13000 (admin / admin) |
+| Keycloak | http://localhost:18443 |
+| Kafka UI | http://localhost:18085 |
 | catalogo-ms / inventario-ms / resenas-ms / orden-ms / pago-ms / cliente-ms / envio-ms / notificaciones-ms | 8081-8088 |
 
 También se puede levantar solo la infra (sin microservicios) con `docker compose -f docker/docker-compose.infra.yml up -d`, y correr un microservicio suelto localmente con `mvn spring-boot:run` apuntando a esa infra ya dockerizada.
@@ -288,3 +292,18 @@ Fases 1, 2, 3, 5, 7 confirmadas (vienen de comentarios ya presentes en `services
 ## Equipo
 
 Anghelo, Yeins, Daniel, Johan — Docente: Abel Angel Sullon Macalupu.
+
+## Unidad II (S06–S11): flujo de compra de ropa
+
+Producto de la unidad, rúbrica con evidencias y guion de demo S12: [docs/u2-producto.md](docs/u2-producto.md).
+
+| Sesión | Qué hay en el código |
+|---|---|
+| S06 – Comunicación síncrona resiliente | `orden-ms` llama a `cliente-ms` (perfil + dirección) y `catalogo-ms` (precio, talla, color) con OpenFeign: timeout, 3 reintentos y Circuit Breaker; si fallan, la orden queda en `CARRITO` (`pwsh scripts/prueba-resiliencia.ps1`). |
+| S07 – Seguridad distribuida | Keycloak (roles `CLIENTE`/`ADMIN`), Gateway y cada servicio validan el JWT; Feign reenvía el token; un cliente solo ve sus órdenes y pagos. |
+| S08 – Mensajería asíncrona | Kafka: `orden.creada`, `stock.reservado`/`stock.rechazado`, `pago.aprobado`/`pago.rechazado`, publicados después del commit. |
+| S09 – Consistencia distribuida | Saga coreografiada con compensación (liberar stock, cancelar orden) y consumidores idempotentes. |
+| S11 – Cliente frontend | SPA Angular en `frontend/`: PKCE con Keycloak (`nextlook-web`), CORS en el Gateway, `talla_preferida` en el token y «Mis pedidos» con *polling* (`pwsh scripts/verificar-s11.ps1`). |
+| S10 – Observabilidad | Liveness/readiness, `X-Trace-ID` por Gateway, Feign y Kafka, Loki + Promtail + Grafana con tablero de diagnóstico (`scripts/simular-falla.ps1`). |
+
+Usuarios de prueba: `cliente@nextlook.pe` / `cliente123`, `admin@nextlook.pe` / `admin123`. Prueba completa: `pwsh scripts/prueba-saga.ps1`.

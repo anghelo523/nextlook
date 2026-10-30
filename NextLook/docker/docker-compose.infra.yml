@@ -1,9 +1,9 @@
 # Infraestructura de DESARROLLO de NextLook: Config Server, Eureka, Gateway, las 8 bases
 # Postgres y Keycloak. Pensado para que cada integrante corra SOLO sus microservicios
 # asignados con Maven (mvn spring-boot:run) contra esta infraestructura ya dockerizada.
-# La pila completa dockerizada (infra + los 8 microservicios + Kafka + observabilidad)
-# se arma en Fase 7 (docker-compose de produccion local).
-name: nextlook-infra-dev
+# Incluye Kafka + Kafka UI (S08) y el realm "nextlook" de Keycloak que se importa al arrancar (S07).
+# La pila completa de produccion local se arma en Fase 7.
+name: nextlook-dev
 
 services:
 
@@ -66,6 +66,8 @@ services:
       # asi), por eso se sobreescribe solo aqui.
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
       EUREKA_INSTANCE_HOSTNAME: nextlook-gateway
+      # S07: dentro de Docker, Keycloak se alcanza por su nombre de servicio, no por localhost:18443
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI: http://keycloak:8080/realms/nextlook/protocol/openid-connect/certs
     depends_on:
       nextlook-config:
         condition: service_healthy
@@ -241,13 +243,57 @@ services:
     image: quay.io/keycloak/keycloak:26.0
     container_name: nextlook-keycloak
     restart: unless-stopped
-    command: start-dev
+    command: start-dev --import-realm
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
       KC_HTTP_PORT: 8080
+      # S10: /health/live, /health/ready y /metrics en el puerto de management (9000)
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+    volumes:
+      # S07: realm nextlook (roles CLIENTE/ADMIN, client nextlook-api y usuarios de prueba)
+      - ./keycloak/nextlook-realm.json:/opt/keycloak/data/import/nextlook-realm.json:ro
     ports:
       - "18443:8080"
+      - "19000:9000"
+    networks:
+      - nextlook-dev-net
+
+  # S08: broker Kafka en modo KRaft (sin ZooKeeper). Clientes fuera de Docker usan localhost:19092;
+  # contenedores de la red nextlook-dev-net usan nextlook-kafka:9092.
+  nextlook-kafka:
+    image: apache/kafka:4.3.1
+    container_name: nextlook-kafka
+    restart: unless-stopped
+    ports:
+      - "19092:19092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:19092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://nextlook-kafka:9092,EXTERNAL://localhost:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@nextlook-kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    networks:
+      - nextlook-dev-net
+
+  nextlook-kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:v1.5.0
+    container_name: nextlook-kafka-ui
+    restart: unless-stopped
+    ports:
+      - "18085:8080"
+    depends_on:
+      - nextlook-kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: nextlook-dev
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: nextlook-kafka:9092
     networks:
       - nextlook-dev-net
 

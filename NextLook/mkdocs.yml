@@ -50,6 +50,8 @@ nav:
   - Flujo end-to-end: flujo-end-to-end.md
   - Consistencia de datos: consistencia.md
   - Notificaciones: notificaciones.md
+  - Observabilidad: observabilidad.md
+  - Cliente web: frontend.md
   - Alcance: alcance.md
   - Producto:
       - U1: u1-producto.md

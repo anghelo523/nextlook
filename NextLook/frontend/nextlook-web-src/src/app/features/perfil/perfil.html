@@ -1,0 +1,60 @@
+<div class="pagina estrecha">
+  <header class="cabecera-pagina">
+    <div>
+      <p class="eyebrow">Tu cuenta</p>
+      <h1 class="titulo">Mi perfil</h1>
+    </div>
+  </header>
+
+  @if (error()) { <p class="aviso mal">{{ error() }}</p> }
+
+  @if (sinPerfil()) {
+    <p class="aviso">Todavia no registraste tus datos de comprador. Los necesitamos para enviar tus pedidos.</p>
+    <form [formGroup]="perfilForm" (ngSubmit)="registrar()" class="panel bloque">
+      <h3>Tus datos</h3>
+      <div class="rejilla-form">
+        <label class="campo">Nombres <input formControlName="nombres" autocomplete="given-name" /></label>
+        <label class="campo">Apellidos <input formControlName="apellidos" autocomplete="family-name" /></label>
+        <label class="campo">DNI <small>8 digitos</small><input formControlName="dni" inputmode="numeric" maxlength="8" /></label>
+        <label class="campo">Celular <small>9 digitos</small><input formControlName="telefono" inputmode="numeric" maxlength="9" autocomplete="tel-national" /></label>
+      </div>
+      <div class="acciones"><button type="submit" class="acento" [disabled]="perfilForm.invalid">Registrar perfil</button></div>
+    </form>
+  } @else if (cliente(); as c) {
+    <section class="panel bloque ficha">
+      <div class="avatar">{{ c.nombres.charAt(0) }}{{ c.apellidos.charAt(0) }}</div>
+      <div>
+        <h3>{{ c.nombres }} {{ c.apellidos }}</h3>
+        <p class="muted">{{ c.email }} · DNI {{ c.dni ?? '—' }} · Cel. {{ c.telefono ?? '—' }}</p>
+        <p class="talla">Talla preferida: <strong>{{ auth.tallaPreferida() ?? 'sin definir' }}</strong></p>
+      </div>
+    </section>
+
+    <section class="panel bloque">
+      <h3>Direcciones de envio</h3>
+      @for (d of c.direcciones; track d.id) {
+        <div class="direccion">
+          <app-icono nombre="camion" [tam]="20" />
+          <div>
+            <strong>{{ d.alias }}</strong> @if (d.principal) { <span class="chip ok">Principal</span> }
+            <p class="muted">{{ d.direccion }}, {{ d.distrito }}, {{ d.ciudad }}@if (d.referencia) { · {{ d.referencia }} }</p>
+          </div>
+        </div>
+      } @empty {
+        <p class="aviso">Agrega una direccion: sin ella no podemos registrar tu pedido.</p>
+      }
+
+      <form [formGroup]="direccionForm" (ngSubmit)="agregarDireccion()" class="nueva">
+        <p class="eyebrow">Nueva direccion</p>
+        <div class="rejilla-form">
+          <label class="campo">Alias <input formControlName="alias" placeholder="Casa, trabajo…" /></label>
+          <label class="campo">Direccion <input formControlName="direccion" autocomplete="street-address" /></label>
+          <label class="campo">Distrito <input formControlName="distrito" /></label>
+          <label class="campo">Ciudad <input formControlName="ciudad" /></label>
+          <label class="campo">Referencia <input formControlName="referencia" /></label>
+        </div>
+        <div class="acciones"><button type="submit" [disabled]="direccionForm.invalid">Guardar direccion</button></div>
+      </form>
+    </section>
+  }
+</div>

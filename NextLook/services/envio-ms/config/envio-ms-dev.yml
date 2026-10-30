@@ -1,9 +1,12 @@
-# Placeholder - envio-ms todavia no esta implementado (ver Fase 2 del plan de construccion).
-# Datasource, puerto y Eureka ya estan fijados segun el esquema de puertos acordado.
 server:
   port: 8087
 
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:18443/realms/nextlook/protocol/openid-connect/certs
   datasource:
     url: jdbc:postgresql://localhost:15438/envio_db
     username: nextlook

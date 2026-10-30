@@ -12,27 +12,26 @@ Gestiona stock, movimientos y reservas asociadas a órdenes. Escucha el evento "
 
 ## Comunicación
 
-- **Asíncrona (entrante):** `orden-ms` → `inventario-ms` (evento "Orden Creada", solicita reserva); `pago-ms` → `inventario-ms` (evento con el resultado del pago: confirma descuento o libera reserva).
-- **Asíncrona (saliente):** `inventario-ms` → `notificaciones-ms` (eventos de inventario).
+- **Asíncrona (entrante):** `orden.creada` (`orden-eventos`) → reserva; `pago.aprobado` → confirma; `pago.rechazado` → libera (compensación).
+- **Asíncrona (saliente):** `stock.reservado` / `stock.rechazado` en `inventario-eventos`. Pendiente: eventos hacia `notificaciones-ms`.
 
 ## Endpoints
 
-<!-- TODO: completar cuando el servicio esté implementado -->
+Solo `ADMIN`: el stock lo mueven los eventos de la Saga, no el comprador.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/api/v1/inventario` | Stock de todas las variantes (`disponible`, `reservado`). |
+| GET | `/api/v1/inventario/{varianteId}` | Stock de una variante. |
+| PUT | `/api/v1/inventario/{varianteId}` | Registra o ajusta stock (`{ "sku": "...", "disponible": 20 }`). |
+| GET | `/api/v1/inventario/reservas/{ordenId}` | Reservas de una orden y su estado. |
 
 ## Entidades
 
-<!-- TODO: completar cuando el servicio esté implementado -->
-
-### `reserva_stock`
-
-Entidad ya confirmada en el brief (ver [Consistencia de datos](../consistencia.md) para el diagrama de estados completo):
-
-| Campo | Descripción |
+| Tabla | Campos clave |
 |---|---|
-| `id` | Identificador de la reserva. |
-| `orden_id` | Orden asociada. |
-| `producto_id` | Producto/variante reservado. |
-| `cantidad` | Cantidad reservada. |
-| `estado` | Estado de la reserva (ver diagrama de estados). |
+| `stock_variante` | `variante_id` (PK, id de catalogo-ms), `sku`, `disponible`, `reservado` |
+| `orden_procesada` | `orden_id` (**UNIQUE** — consumidor idempotente), `resultado` (RESERVADO/RECHAZADO), `motivo` |
+| `reserva_stock` | `orden_id`, `variante_id` (UNIQUE juntos), `cantidad`, `estado` (RESERVADA/CONFIRMADA/LIBERADA) |
 
-<!-- TODO: completar tipos de dato, claves y demás campos cuando el servicio esté implementado -->
+La reserva es *todo o nada* y bloquea filas (`SELECT … FOR UPDATE`) en orden de `variante_id` para que dos compradores no se lleven la última talla.

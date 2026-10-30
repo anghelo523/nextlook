@@ -1,0 +1,87 @@
+<section class="hero">
+  <img class="hero-foto" src="img/hero.jpg" alt="" fetchpriority="high" />
+  <div class="hero-velo"></div>
+  <div class="hero-texto aparece">
+    <p class="eyebrow claro">Coleccion urbana · Temporada {{ anio }}</p>
+    <h1>Vestir<br />la <span class="serif">ciudad</span></h1>
+    <p class="bajada">Basicos con caracter, denim y capas para moverte por Lima. Elige talla y color, y sigue tu pedido en vivo.</p>
+    <div class="hero-acciones">
+      <a routerLink="/catalogo" class="btn acento">Ver catalogo <app-icono nombre="flecha" [tam]="18" /></a>
+      @if (!auth.autenticado()) {
+        <button type="button" class="claro" (click)="auth.iniciarLogin('/catalogo')">Ingresar</button>
+      }
+    </div>
+    @if (auth.tallaPreferida(); as talla) {
+      <p class="talla">Te mostramos primero tu talla: <strong>{{ talla }}</strong></p>
+    }
+  </div>
+</section>
+
+<section class="beneficios">
+  <div><app-icono nombre="camion" [tam]="26" /><span><strong>Envio gratis</strong> en todos tus pedidos</span></div>
+  <div><app-icono nombre="celular" [tam]="26" /><span><strong>Tarjeta, Yape o Plin</strong> en un solo paso</span></div>
+  <div><app-icono nombre="cambio" [tam]="26" /><span><strong>Cambios</strong> sin costo por 30 dias</span></div>
+  <div><app-icono nombre="escudo" [tam]="26" /><span><strong>Pago seguro</strong> y seguimiento en vivo</span></div>
+</section>
+
+@if (categorias().length > 0) {
+  <section class="seccion">
+    <header class="seccion-cabecera">
+      <div>
+        <p class="eyebrow">Compra por categoria</p>
+        <h2>Lo que <span class="serif">se lleva</span></h2>
+      </div>
+      <a routerLink="/catalogo" class="btn secundario chico">Ver todo</a>
+    </header>
+    <div class="categorias">
+      @for (c of categorias(); track c.id) {
+        <a class="categoria" routerLink="/catalogo" [queryParams]="{ categoria: c.id }">
+          @if (c.foto) { <img [src]="c.foto" [alt]="c.nombre" loading="lazy" /> }
+          <span class="categoria-nombre">{{ c.nombre }} <app-icono nombre="flecha" [tam]="18" /></span>
+        </a>
+      }
+    </div>
+  </section>
+}
+
+<section class="editorial">
+  <div class="editorial-foto">
+    <img src="img/calle.jpg" alt="" loading="lazy" />
+  </div>
+  <div class="editorial-texto">
+    <p class="eyebrow">Manifiesto</p>
+    <h2>Menos ruido.<br /><span class="serif">Mas estilo.</span></h2>
+    <p>Prendas que funcionan juntas: un buen hoodie, un denim que dura, una casaca que aguanta la garua. Diseñamos
+      basicos con calce cuidado y los combinamos con piezas de calle para que armes tu look sin pensarlo dos veces.</p>
+    <a routerLink="/catalogo" class="btn">Explorar la coleccion <app-icono nombre="flecha" [tam]="18" /></a>
+  </div>
+</section>
+
+@if (novedades().length > 0) {
+  <section class="seccion">
+    <header class="seccion-cabecera">
+      <div>
+        <p class="eyebrow">Recien llegado</p>
+        <h2>Novedades</h2>
+      </div>
+    </header>
+    <div class="novedades">
+      @for (p of novedades(); track p.id) {
+        <a class="novedad" routerLink="/catalogo" [queryParams]="{ categoria: p.categoria.id }">
+          <div class="novedad-foto"><img [src]="urlImagen(p.imagenUrl)" [alt]="p.nombre" loading="lazy" /></div>
+          <p class="eyebrow">{{ p.marca }}</p>
+          <p class="novedad-nombre">{{ p.nombre }}</p>
+          <p class="novedad-precio">{{ soles(p.precio) }}</p>
+        </a>
+      }
+    </div>
+  </section>
+}
+
+<section class="banda">
+  <img src="img/noche.jpg" alt="" loading="lazy" />
+  <div class="banda-texto">
+    <h2>Paga como <span class="serif">quieras</span></h2>
+    <p>Tarjeta, Yape o Plin. Te guiamos paso a paso y ves tu compra confirmada al instante.</p>
+  </div>
+</section>

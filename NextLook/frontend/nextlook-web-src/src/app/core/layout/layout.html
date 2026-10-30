@@ -1,0 +1,85 @@
+<div class="anuncio" role="note">
+  <div class="cinta">
+    @for (vuelta of [1, 2]; track vuelta) {
+      <span>Envio gratis en todos tus pedidos</span><span aria-hidden="true">✦</span>
+      <span>Paga con tarjeta, Yape o Plin</span><span aria-hidden="true">✦</span>
+      <span>Cambios sin costo por 30 dias</span><span aria-hidden="true">✦</span>
+      <span>Nueva coleccion urbana</span><span aria-hidden="true">✦</span>
+    }
+  </div>
+</div>
+
+<header class="header">
+  <div class="barra">
+    <button type="button" class="hamburguesa" [attr.aria-expanded]="menuAbierto()" aria-controls="menu-principal"
+            (click)="menuAbierto.set(!menuAbierto())">
+      <app-icono [nombre]="menuAbierto() ? 'cerrar' : 'menu'" [tam]="22" />
+      <span class="visualmente-oculto">Menu</span>
+    </button>
+
+    <a routerLink="/" class="marca" (click)="menuAbierto.set(false)">NEXT<span>LOOK</span></a>
+
+    <nav id="menu-principal" class="menu" [class.abierto]="menuAbierto()" aria-label="Menu principal" (click)="menuAbierto.set(false)">
+      <a routerLink="/catalogo" routerLinkActive="activo">Catalogo</a>
+      @if (auth.tieneRol('CLIENTE')) {
+        <a routerLink="/mis-pedidos" routerLinkActive="activo">Mis pedidos</a>
+        <a routerLink="/perfil" routerLinkActive="activo">Mi perfil</a>
+      }
+      @if (auth.tieneRol('ADMIN')) {
+        <a routerLink="/admin/productos" routerLinkActive="activo">Productos</a>
+        <a routerLink="/admin/pagos" routerLinkActive="activo">Pagos</a>
+      }
+    </nav>
+
+    <div class="sesion">
+      @if (auth.autenticado()) {
+        <span class="saludo">Hola, <strong>{{ auth.nombre() }}</strong>
+          @if (auth.tieneRol('ADMIN')) { <span class="chip acento-chip">Admin</span> }
+        </span>
+        <button type="button" class="icono-btn" title="Cerrar sesion" (click)="auth.cerrarSesion()">
+          <app-icono nombre="salir" />
+          <span class="visualmente-oculto">Cerrar sesion</span>
+        </button>
+      } @else {
+        <button type="button" class="icono-btn" title="Iniciar sesion" (click)="auth.iniciarLogin()">
+          <app-icono nombre="usuario" />
+          <span class="etiqueta">Ingresar</span>
+        </button>
+      }
+      @if (auth.tieneRol('CLIENTE')) {
+        <a routerLink="/bolsa" class="icono-btn bolsa" title="Tu bolsa">
+          <app-icono nombre="bolsa" />
+          @if (bolsa.unidades() > 0) {
+            <span class="contador" aria-label="prendas en la bolsa">{{ bolsa.unidades() }}</span>
+          }
+        </a>
+      }
+    </div>
+  </div>
+</header>
+
+<main class="contenido">
+  <router-outlet />
+</main>
+
+<footer class="pie">
+  <div class="pie-interno">
+    <div class="pie-marca">
+      <span class="marca grande">NEXT<span>LOOK</span></span>
+      <p>Basicos con caracter y prendas urbanas pensadas para la ciudad. Hecho en Lima.</p>
+    </div>
+    <div>
+      <p class="eyebrow claro">Tienda</p>
+      <a routerLink="/catalogo">Todo el catalogo</a>
+      <a routerLink="/catalogo" [queryParams]="{ genero: 'MUJER' }">Mujer</a>
+      <a routerLink="/catalogo" [queryParams]="{ genero: 'HOMBRE' }">Hombre</a>
+    </div>
+    <div>
+      <p class="eyebrow claro">Ayuda</p>
+      <span>Envios a todo el Peru</span>
+      <span>Cambios en 30 dias</span>
+      <span>Pagos con tarjeta, Yape y Plin</span>
+    </div>
+  </div>
+  <div class="pie-legal">© {{ anio }} NextLook · Proyecto academico de microservicios</div>
+</footer>

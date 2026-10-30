@@ -15,7 +15,7 @@ Detalle completo (endpoints, entidades, rol protegido, comunicación): [../../do
 
 ## Estado actual
 
-Implementado como esqueleto Spring Boot bootable (sin logica de negocio todavia: sin entidades, repositorios ni controladores, ver TODOs en la doc de arriba). Ya se registra en Eureka, expone `/actuator/health` y `/actuator/prometheus`, y se conecta a su base y al Config Server. Se levanta junto con el resto de microservicios:
+Implementado (U2): creación de órdenes con validación síncrona (Feign + Circuit Breaker hacia `cliente-ms` y `catalogo-ms`, fallback a `CARRITO`), publicación de `orden.creada` en Kafka y reacción a los eventos de stock y pago de la Saga. Ya se registra en Eureka, expone `/actuator/health` y `/actuator/prometheus`, y se conecta a su base y al Config Server. Se levanta junto con el resto de microservicios:
 
 ```
 docker compose -f ../../docker/docker-compose.infra.yml -f ../compose-dev.yml up -d --build orden-ms

@@ -4,7 +4,7 @@
 # Docker Compose resuelve las rutas relativas de todos los archivos contra la carpeta del
 # primer -f, por eso los "context:" de abajo son relativos a docker/, no a este archivo):
 #   docker compose -f docker/docker-compose.infra.yml -f services/compose-dev.yml up -d --build
-name: nextlook-services-dev
+name: nextlook-dev
 
 services:
 
@@ -21,6 +21,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-catalogo:5432/catalogo_db
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
       EUREKA_INSTANCE_HOSTNAME: catalogo-ms
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI: http://keycloak:8080/realms/nextlook/protocol/openid-connect/certs
     depends_on:
       nextlook-config:
         condition: service_healthy
@@ -42,6 +43,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-inventario:5432/inventario_db
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
       EUREKA_INSTANCE_HOSTNAME: inventario-ms
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI: http://keycloak:8080/realms/nextlook/protocol/openid-connect/certs
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: nextlook-kafka:9092
     depends_on:
       nextlook-config:
         condition: service_healthy
@@ -63,6 +66,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-resenas:5432/resenas_db
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
       EUREKA_INSTANCE_HOSTNAME: resenas-ms
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI: http://keycloak:8080/realms/nextlook/protocol/openid-connect/certs
     depends_on:
       nextlook-config:
         condition: service_healthy
@@ -84,6 +88,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-orden:5432/orden_db
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
       EUREKA_INSTANCE_HOSTNAME: orden-ms
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI: http://keycloak:8080/realms/nextlook/protocol/openid-connect/certs
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: nextlook-kafka:9092
     depends_on:
       nextlook-config:
         condition: service_healthy
@@ -105,6 +111,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-pago:5432/pago_db
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
       EUREKA_INSTANCE_HOSTNAME: pago-ms
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI: http://keycloak:8080/realms/nextlook/protocol/openid-connect/certs
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: nextlook-kafka:9092
     depends_on:
       nextlook-config:
         condition: service_healthy
@@ -126,6 +134,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-cliente:5432/cliente_db
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
       EUREKA_INSTANCE_HOSTNAME: cliente-ms
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI: http://keycloak:8080/realms/nextlook/protocol/openid-connect/certs
     depends_on:
       nextlook-config:
         condition: service_healthy
@@ -147,6 +156,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-envio:5432/envio_db
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
       EUREKA_INSTANCE_HOSTNAME: envio-ms
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI: http://keycloak:8080/realms/nextlook/protocol/openid-connect/certs
     depends_on:
       nextlook-config:
         condition: service_healthy
@@ -168,6 +178,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-notificaciones:5432/notificaciones_db
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://nextlook-eureka:18761/eureka
       EUREKA_INSTANCE_HOSTNAME: notificaciones-ms
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI: http://keycloak:8080/realms/nextlook/protocol/openid-connect/certs
     depends_on:
       nextlook-config:
         condition: service_healthy
