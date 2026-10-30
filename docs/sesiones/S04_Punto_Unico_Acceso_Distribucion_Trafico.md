@@ -1,0 +1,1268 @@
+# S4 - Punto Único de Acceso y Distribución de Tráfico
+
+*Por: Angel Sullon Macalupu @asullom - 2026*
+
+## 1. Introducción
+
+Tiempo: 20 min.
+
+### 1.1 Presentación de la sesión
+
+Aunque el registro y descubrimiento de servicios ya resuelve que ningún componente necesite memorizar direcciones a mano, quien prueba el sistema desde afuera — un cliente real, no otro microservicio — todavía tiene que conocer el puerto exacto de cada instancia y decidir a cuál llamar. Esta sesión resuelve exactamente eso: un único punto de entrada que recibe todas las peticiones externas, resuelve el servicio correcto por su nombre lógico y reparte el tráfico entre las instancias disponibles, sin que quien llama sepa nunca cuántas hay ni en qué puerto responde cada una.
+
+### 1.2 Índice
+
+1. Punto único de acceso.
+2. Distribución de tráfico entre instancias.
+
+### 1.3 Propósito de aprendizaje
+
+Al concluir la clase, estarás en condiciones de:
+
+- **Configurar e implementar** un punto único de acceso que enrute peticiones hacia los servicios ya registrados y reparta el tráfico entre sus instancias disponibles, sin que quien consume el sistema conozca puertos ni direcciones individuales.
+
+### 1.4 Producto de sesión
+
+`consolas-gateway` operativo en `infra/consolas-gateway`, con rutas hacia `consolas-catalogo-ms` (`/api/v1/categorias`, `/api/v1/productos`) resueltas mediante `lb://` sobre el registro de `consolas-eureka`, balanceando tráfico entre sus dos instancias (`8080`/`8081`, S3), verificado con múltiples peticiones consecutivas al mismo punto de entrada.
+
+### 1.5 Metodología
+
+**Tabla 1. Metodología de la sesión**
+
+| Actividades a Realizar en el Periodo | Orientaciones generales (Orientaciones Metodológicas) | Material de estudio recomendado |
+|---|---|---|
+| Revisión previa individual | Confirmar que `consolas-eureka` y las dos instancias de `consolas-catalogo-ms` (S3) siguen registrándose en DEV. Trabajo individual, antes de clase; identificar qué puerto habría que usar hoy para llamar a cada instancia sin ningún componente nuevo. | Evidencia individual de S3, dashboard de `consolas-eureka`. |
+| Clase presencial | Construcción guiada de `consolas-gateway`, con rutas hacia `consolas-catalogo-ms` y balanceo de carga verificado entre sus dos instancias. Trabajo individual, siguiendo al docente paso a paso; consulta inmediata ante una ruta que no resuelve. Quien cuente con los recursos de cómputo puede continuar con Grafana (3.7, opcional) y con producción local (3.8, opcional). | Pasos 3.1 a 3.6 de esta guía (3.7-3.8 son opcionales). |
+| Evaluación formativa | Revisión en clase de `consolas-gateway` respondiendo por HTTP y de al menos dos peticiones consecutivas resueltas por instancias distintas. La evidencia se completa y sustenta de forma individual, fuera del aula, según los criterios mínimos de la sección 4.4. | Indicaciones de entrega (4.3), rúbrica de evaluación (4.6). |
+
+### 1.6 Motivación de la sesión
+
+#### 1.6.1 Caso: el puerto que el cliente ya no debería conocer
+
+Con dos instancias de `consolas-catalogo-ms` registradas en `consolas-eureka` (sesión 3), un cliente que prueba a mano —PowerShell, Swagger— sigue escribiendo `localhost:8080` o `localhost:8081`: el registro le sirve a otro microservicio, o a una herramienta de observabilidad, pero no a ese cliente externo, que nunca consulta a Eureka por su cuenta. Si mañana aparece una tercera instancia, o una de las dos existentes se cae, ese cliente sigue apuntando a un puerto fijo que puede dejar de responder — nadie le avisa que la topología cambió.
+
+La solución no es que el cliente aprenda a consultar Eureka también — es que nunca necesite hacerlo: un único punto de entrada recibe la petición, resuelve el nombre lógico por su cuenta, y decide a qué instancia enviarla. El cliente solo conoce una dirección, siempre la misma, sin importar cuántas instancias haya detrás ni cuál de ellas responda esta vez.
+
+**Preguntas de análisis**
+
+**Activación de conocimientos previos**
+
+1. En la sesión 3, ¿qué componente consultaba a `consolas-eureka` por nombre lógico, y qué componente seguía necesitando el puerto exacto de cada instancia?
+
+**Comprensión del punto único de acceso**
+
+1. Si un cliente externo llamara directamente a `consolas-catalogo-ms:8081` y esa instancia se cayera, ¿qué pasaría con esa petición? ¿Cambiaría algo si el cliente llamara al punto único de acceso en vez de al puerto directo?
+2. ¿Por qué "repartir tráfico entre instancias" necesita primero "encontrar las instancias disponibles" — y por qué eso ya estaba resuelto desde la sesión anterior?
+
+### 1.7 Ubicación en el curso
+
+- Unidad: U1 - Sistema distribuido base orientado a producción.
+- Producto del curso: sistema distribuido de microservicios end-to-end, configurable, escalable, seguro, resiliente, consistente, observable, integrado con frontend y defendido técnicamente.
+- Producto de unidad: sistema distribuido base funcional, configurable y preparado para múltiples instancias.
+- Avance del producto en esta sesión: punto único de acceso operativo, con rutas resueltas por descubrimiento y tráfico repartido entre instancias.
+
+**Figura 1. Roadmap del producto de la unidad**
+
+```mermaid
+flowchart TB
+    Cliente["Cliente de prueba - PowerShell / bash / Swagger"]
+    Gateway["Gateway - punto único de acceso - balanceo de carga - HOY - puerto 18080 (DEV)"]
+    Catalogo["consolas-catalogo-ms - construido en S1 - REST + BD + health"]
+    Orden["consolas-orden-ms - trabajo aplicado"]
+    Eureka["Registro de servicios - consolas-eureka - construido en S3 - puerto 18761 (DEV)"]
+    Config["Servidor de configuración - consolas-config - construido en S2"]
+    Repo[("Repositorio de configuración - config-repo")]
+
+    Cliente --> Gateway
+    Gateway -->|"lb://consolas-catalogo-ms"| Catalogo
+    Gateway -->|"lb://consolas-orden-ms"| Orden
+    Gateway -. descubre servicios .-> Eureka
+    Catalogo -. registra instancia .-> Eureka
+    Orden -. registra instancia .-> Eureka
+    Gateway -. carga configuración .-> Config
+    Catalogo -. carga configuración .-> Config
+    Config --> Repo
+
+    classDef done fill:#e8f5e9,stroke:#2e7d32,color:#111;
+    classDef today fill:#ffe08a,stroke:#9a6b00,stroke-width:2px,color:#111;
+    class Catalogo,Eureka,Config done;
+    class Gateway today;
+```
+
+Hoy se construye `consolas-gateway` con rutas hacia `consolas-catalogo-ms`, ya registrado con dos instancias desde S3. `consolas-orden-ms` (todavía sin Config Client ni Eureka Client, según se haya completado o no el trabajo autónomo de S3) recibe su propia ruta como trabajo autónomo de esta sesión (sección 4) — el mismo patrón, aplicado sobre el segundo microservicio.
+
+## 2. Explica
+
+Tiempo: 25 min.
+
+### 2.1 Arquitectura de la sesión
+
+**Figura 2. De la petición externa a la instancia que la atiende**
+
+```mermaid
+flowchart LR
+    Cliente["Cliente externo"]
+    GW["consolas-gateway<br/>puerto 18080 (DEV)"]
+    LB["Resolución lb://<br/>elige una instancia"]
+    Eureka[("consolas-eureka<br/>puerto 18761 (DEV)")]
+    I1["consolas-catalogo-ms<br/>instancia 1, puerto 8080"]
+    I2["consolas-catalogo-ms<br/>instancia 2, puerto 8081"]
+
+    Cliente -->|"1. petición 1: GET /api/v1/categorias"| GW
+    Cliente -.->|"1. petición 2"| GW
+    Cliente -. "1. petición 3" .-> GW
+    GW -->|"2. resuelve la ruta"| LB
+    LB -.->|"3. consulta instancias vivas"| Eureka
+    LB -->|"4. turno 1"| I1
+    LB -.->|"4. turno 2"| I2
+    LB -. "4. turno 3, vuelve a empezar" .-> I1
+```
+
+Lectura del diagrama: el cliente ya no llama a `consolas-catalogo-ms` — llama a `consolas-gateway`, siempre a la misma dirección. `consolas-gateway` reconoce la ruta por su `Path` (2.3), resuelve `lb://consolas-catalogo-ms` preguntándole a `consolas-eureka` qué instancias están vivas en ese instante, y reenvía cada petición a una instancia distinta, en turnos — la primera petición cae en la instancia 1, la segunda en la instancia 2, la tercera vuelve a la instancia 1. Quien prueba a mano ya no necesita escribir `:8080` ni `:8081`: las tres peticiones usan siempre `18080`, sin que el cliente note ninguna diferencia en la respuesta. Este diagrama es el mapa que guía el resto de la explicación: cada apartado siguiente desarrolla uno de sus componentes, en el mismo orden del Índice (1.2) — incluyendo el propio algoritmo de turnos, que 2.3 retoma con su propio diagrama (Figura 4).
+
+Ese flujo es el mismo en DEV y en producción local — lo que cambia entre un ambiente y otro no es *cómo* resuelve el Gateway, sino *quién más puede llegar directo a una instancia sin pasar por él*:
+
+**Figura 3. Punto único de acceso en producción local**
+
+```mermaid
+flowchart TB
+    Cliente["Cliente externo"]
+    GW["consolas-gateway<br/>único puerto expuesto al host: 28080"]
+    Eureka[("consolas-eureka<br/>puerto 28761, solo dashboard")]
+    I1["consolas-catalogo-ms<br/>réplica 1, sin puerto expuesto"]
+    I2["consolas-catalogo-ms<br/>réplica 2, sin puerto expuesto"]
+
+    Cliente -->|"único punto de entrada"| GW
+    GW -.->|"resuelve lb://"| Eureka
+    GW --> I1
+    GW --> I2
+    I1 -. registra instancia .-> Eureka
+    I2 -. registra instancia .-> Eureka
+```
+
+En DEV (Figura 2), cualquiera puede seguir llamando directo a `localhost:8080` o `:8081` — los microservicios corren con Maven en el host, con sus puertos fijos abiertos, precisamente para poder probarlos uno por uno mientras se aprende (3.5-3.6). En producción local, eso deja de ser posible a propósito: `services/consolas-catalogo-ms/compose.yml` ya trae el puerto de sus réplicas comentado desde S2 (`#ports: #  - "28080:8080"`) — ninguna réplica publica nada al host, solo son alcanzables dentro de `consolas-prod-net`. `consolas-gateway` (3.8, opcional) es el único componente que expone un puerto **de negocio** (`28080`, tráfico real de la API): el punto único de acceso, llevado a su consecuencia real — no es solo que el cliente *prefiera* pasar por el Gateway, es que en producción **no tiene otra forma de llegar** a un microservicio. `consolas-eureka` sí sigue exponiendo su puerto (`28761`, en `infra/compose.yml` desde S3) — pero solo para que el equipo revise su dashboard desde el host; ningún cliente de negocio le pega directo a `28761`, la única puerta de entrada para tráfico real sigue siendo `28080`.
+
+### 2.2 Punto único de acceso
+
+Un **Gateway** (o *API Gateway*) es el componente que recibe todo el tráfico externo de un sistema distribuido y lo reenvía hacia el microservicio correcto — el cliente conoce una sola dirección, nunca la topología interna del sistema. Sin Gateway, cada cliente tendría que conocer la dirección de cada microservicio (y de cada una de sus instancias) por separado; agregar un microservicio nuevo, o escalar uno existente, obligaría a actualizar a **todos** los clientes que lo llaman directamente.
+
+Según SACAViX System Design (2026), un API Gateway centraliza el punto de entrada de un sistema distribuido, ocultando la topología interna y permitiendo aplicar en un solo lugar preocupaciones transversales (enrutamiento, balanceo de carga, y más adelante en el curso, autenticación) que de otro modo se repetirían en cada microservicio.
+
+**Error frecuente**: pensar que el Gateway reemplaza al registro de servicios (`consolas-eureka`, S3). No lo reemplaza — lo consume. El Gateway sigue necesitando saber qué instancias existen y están vivas; lo que cambia es *quién* le pregunta eso a Eureka: antes, cada cliente potencial; ahora, un único componente, una sola vez por petición.
+
+**Punto único de acceso y balanceo de carga no son el mismo patrón, aunque en esta sesión se construyan juntos.** SACAViX System Design los documenta por separado: la propia página de *API Gateway* lista *Load Balancing* como patrón **relacionado**, no como parte de su definición — porque cada uno resuelve un problema distinto y puede existir sin el otro. Un balanceador de carga puro (por ejemplo, un ALB de AWS repartiendo tráfico entre instancias de un único servicio) no enruta nada por ruta ni oculta ninguna topología de microservicios; un Gateway podría enrutar peticiones hacia servicios que tienen una sola instancia cada uno, sin repartir nada entre copias. Lo que hace `consolas-gateway` es **componer** los dos: cuando resuelve una ruta con `uri: lb://...` (2.3), delega la elección de instancia a Spring Cloud LoadBalancer — una librería distinta, con su propia responsabilidad — en vez de reimplementar el balanceo dentro del enrutador. Spring Cloud Gateway los junta por conveniencia de configuración, no porque sean, en el fondo, el mismo patrón.
+
+Esa composición tiene un costo que SACAViX System Design (2026) también documenta como *trade-off* del API Gateway, no solo una ventaja: si `consolas-gateway` se cae, el sistema entero queda sin punto de entrada, aunque las dos instancias de `consolas-catalogo-ms` sigan perfectamente vivas — un único punto de acceso es, también, un único punto de fallo. Esta sesión no resuelve eso (implica correr varias instancias del propio Gateway, con su propio balanceo por delante); solo lo deja documentado como una limitación real, no oculta, de lo que se construye hoy.
+
+### 2.3 Distribución de tráfico entre instancias
+
+Una **ruta** en el Gateway conecta un patrón de entrada (qué peticiones atrapa) con un destino. En Spring Cloud Gateway, una ruta se define con tres piezas:
+
+- **`id`**: nombre de la ruta, solo para identificarla en configuración y logs.
+- **`predicates`**: condición que decide si una petición entra por esta ruta — la más común es `Path`, que compara la URL de la petición contra un patrón.
+- **`uri`**: destino de la ruta. El esquema `lb://` (*load-balanced*) es la pieza clave: en vez de una dirección fija (`http://localhost:8080`), `lb://consolas-catalogo-ms` le dice al Gateway "resuelve este nombre lógico contra el registro, y elige una instancia viva" — exactamente lo mismo que ya hace cualquier cliente de Eureka (S3, 2.4), aplicado ahora a nivel de ruta.
+
+El **balanceo de carga** es la decisión de *cuál* instancia recibe cada petición, entre todas las que el registro reporta como vivas en ese instante. Spring Cloud LoadBalancer (el balanceador que resuelve el esquema `lb://`) usa por defecto `RoundRobinLoadBalancer`: reparte las peticiones en turnos, una instancia después de otra, sin favorecer ninguna — la primera petición a una instancia, la segunda a la otra, la tercera de vuelta a la primera. Nadie lo eligió a mano en `consolas-gateway` (3.4) — es lo que Spring Cloud LoadBalancer usa si no se le indica otra cosa.
+
+**Figura 4. Round Robin, el algoritmo que usa `consolas-gateway` hoy**
+
+```mermaid
+flowchart LR
+    Cliente["Cliente externo"]
+    GW["consolas-gateway<br/>puerto 18080 (DEV)<br/>Round Robin"]
+    Eureka[("consolas-eureka<br/>puerto 18761 (DEV)")]
+    I1["consolas-catalogo-ms<br/>instancia 1, puerto 8080"]
+    I2["consolas-catalogo-ms<br/>instancia 2, puerto 8081"]
+
+    Cliente -->|"petición 1"| GW
+    GW -. consulta instancias vivas .-> Eureka
+    GW -->|"turno 1"| I1
+    Cliente -.->|"petición 2"| GW
+    GW -.->|"turno 2"| I2
+    Cliente -. "petición 3" .-> GW
+    GW -. "turno 3, vuelve a empezar" .-> I1
+```
+
+Es el algoritmo activo en `consolas-gateway` sin ninguna configuración adicional (3.4-3.6): cada petición nueva a `lb://consolas-catalogo-ms` consulta a `consolas-eureka` qué instancias siguen vivas, y cae en la instancia siguiente del turno, alternando 8080/8081 en orden fijo. La verificación de 3.6 (peticiones repetidas contra `18080`, revisando qué instancia respondió cada vez por su log) es, en el fondo, observar este mismo diagrama en vivo.
+
+**Cómo se cambiaría** (fuera del alcance de esta sesión, solo para que quede claro que es configuración, no una limitación fija): Spring Cloud LoadBalancer trae un segundo algoritmo listo para usar, `RandomLoadBalancer` (elige una instancia al azar en cada petición, en vez de por turnos). Se activa declarando una configuración específica para el servicio, con `@LoadBalancerClient`:
+
+```java
+@LoadBalancerClient(name = "consolas-catalogo-ms", configuration = CatalogoLoadBalancerConfig.class)
+public class PagatuGatewayApplication { /* ... */ }
+
+class CatalogoLoadBalancerConfig {
+    @Bean
+    ReactorLoadBalancer<ServiceInstance> randomLoadBalancer(
+            Environment environment, LoadBalancerClientFactory factory) {
+        String name = environment.getProperty(LoadBalancerClientFactory.PROPERTY_NAME);
+        return new RandomLoadBalancer(
+            factory.getLazyProvider(name, ServiceInstanceListSupplier.class), name);
+    }
+}
+```
+
+`RoundRobinLoadBalancer` y `RandomLoadBalancer` son los dos únicos algoritmos que Spring Cloud LoadBalancer trae listos para usar. Los otros que documenta SACAViX System Design (2026) — *Weighted Round Robin*, *Least Connections*, *IP Hash/Consistent Hashing*, *Least Response Time* — no vienen incluidos: implementarlos exige escribir una clase propia de balanceo (misma interfaz `ReactorServiceInstanceLoadBalancer` que ya usan los dos anteriores), trabajo real, no una propiedad de configuración. Por eso quedan fuera del alcance de esta sesión — se documentan aquí como panorama, no como algo que se construye hoy.
+
+**Figura 5. Weighted Round Robin, sobre las instancias de hoy**
+
+```mermaid
+flowchart LR
+    LB{"consolas-gateway<br/>puerto 18080 (DEV)<br/>Weighted Round Robin"}
+    I1["consolas-catalogo-ms<br/>instancia 1, puerto 8080<br/>peso 1"]
+    I2["consolas-catalogo-ms<br/>instancia 2, puerto 8081<br/>peso 2 - el doble de recursos"]
+
+    LB -->|"~33% del tráfico"| I1
+    LB -->|"~66% del tráfico"| I2
+```
+
+Reparte proporcional al peso asignado a cada instancia — necesario con hardware heterogéneo. Las dos instancias de `consolas-catalogo-ms` de hoy corren en la misma máquina, con la misma capacidad: no hay ningún peso real que asignar, por eso *round-robin* sin pesos ya reparte parejo.
+
+**Figura 6. Least Connections, sobre las instancias de hoy**
+
+```mermaid
+flowchart LR
+    LB{"consolas-gateway<br/>puerto 18080 (DEV)<br/>Least Connections"}
+    I1["consolas-catalogo-ms<br/>instancia 1, puerto 8080<br/>12 conexiones activas"]
+    I2["consolas-catalogo-ms<br/>instancia 2, puerto 8081<br/>3 conexiones activas"]
+
+    LB -.->|"no elegida, más carga"| I1
+    LB -->|"elegida: menos conexiones activas"| I2
+```
+
+Envía cada petición nueva a la instancia con menos conexiones activas en ese instante — útil cuando las conexiones duran tiempos muy distintos (WebSockets de larga duración mezclados con peticiones HTTP cortas). Las peticiones de hoy (`GET /api/v1/categorias`) son todas cortas y de duración parecida: contar conexiones activas no aportaría una decisión distinta a la de repartir por turnos.
+
+**Figura 7. IP Hash / Consistent Hashing, sobre las instancias de hoy**
+
+```mermaid
+flowchart LR
+    CA["Cliente A<br/>203.0.113.5<br/>2 peticiones distintas"]
+    CB["Cliente B<br/>198.51.100.7"]
+    GW{"consolas-gateway<br/>puerto 18080 (DEV)<br/>IP Hash"}
+    I1["consolas-catalogo-ms<br/>instancia 1, puerto 8080"]
+    I2["consolas-catalogo-ms<br/>instancia 2, puerto 8081"]
+
+    CA -->|"hash(203.0.113.5)"| GW
+    CB -->|"hash(198.51.100.7)"| GW
+    GW -->|"siempre la misma instancia"| I2
+    GW -->|"otro hash, otra instancia"| I1
+```
+
+Calcula un hash a partir de la IP del cliente (u otro identificador) para que el mismo cliente siempre golpee la misma instancia — necesario solo si el servicio guarda estado en memoria local, que se perdería si la siguiente petición del mismo cliente cayera en otra instancia. `consolas-catalogo-ms` no guarda ningún estado propio en memoria — su único estado real vive en `consolas_catalogo_db` (PostgreSQL), compartido por ambas instancias por igual; no hay nada que "recordar" de un cliente entre una petición y la siguiente.
+
+**Figura 8. Least Response Time, sobre las instancias de hoy**
+
+```mermaid
+flowchart LR
+    LB{"consolas-gateway<br/>puerto 18080 (DEV)<br/>Least Response Time"}
+    I1["consolas-catalogo-ms<br/>instancia 1, puerto 8080<br/>~120ms promedio"]
+    I2["consolas-catalogo-ms<br/>instancia 2, puerto 8081<br/>~35ms promedio"]
+
+    LB -.->|"no elegida, más lenta"| I1
+    LB -->|"elegida: menor latencia reciente"| I2
+```
+
+Combina conexiones activas con la latencia reciente de cada instancia, enviando tráfico a la que responde más rápido con menos carga — el más preciso de los cinco, también el más costoso de operar, porque exige monitorear tiempos de respuesta en vivo. Con dos instancias idénticas, sin diferencia real de capacidad ni de carga, no hay ninguna latencia distinta que detectar.
+
+Las dos instancias de `consolas-catalogo-ms` de esta sesión son idénticas en capacidad y no guardan ningún estado propio — exactamente el escenario donde *round-robin*, el más simple de los cinco, ya es suficiente. Elegir un algoritmo más sofisticado sin una razón real (como las de las cuatro figuras anteriores) no mejora nada — solo agrega complejidad operacional donde no hace falta.
+
+Aislando solo la diferencia entre `uri: http://...` (una dirección fija) y `uri: lb://...` (2.2) — misma ruta, mismo Gateway, mismo `predicates`, la única variable es si el destino se resuelve por balanceo o no:
+
+`consolas-eureka` (S3) sigue corriendo en los dos casos, y las dos instancias de `consolas-catalogo-ms` siguen registrándose en él exactamente igual — lo que cambia no es si Eureka existe, sino si **esta ruta en particular** lo consulta. Con `uri: http://localhost:8080`, el Gateway nunca le pregunta nada al registro: envía la petición a esa dirección literal, exista o no esa instancia en ese momento, esté registrada o no, sin importar cuántas otras instancias estén vivas — el registro sigue ahí, simplemente nadie lo mira para esta ruta. Con `uri: lb://consolas-catalogo-ms`, el Gateway sí consulta a `consolas-eureka` en cada petición, y recién ahí el balanceador elige entre las instancias que el registro reporta vivas.
+
+**Tabla 2. Sin balanceo de carga y con balanceo de carga**
+
+| | Ruta sin balanceo (`uri: http://localhost:8080`) | Ruta con balanceo (`uri: lb://consolas-catalogo-ms`) |
+|---|---|---|
+| ¿Esta ruta consulta a `consolas-eureka`? | No — la dirección ya está fija en la propia ruta | Sí, en cada petición, para saber qué instancias siguen vivas |
+| Cuántas instancias puede atender la ruta | Una sola, la que esté escrita en la dirección | Todas las que el registro reporte vivas en ese momento |
+| Qué pasa si esa instancia recibe más tráfico del que soporta | Toda la carga cae sobre ella, sin alternativa | Se reparte entre las instancias disponibles |
+| Qué pasa si se agrega una instancia nueva | Nadie la usa hasta que alguien edite la ruta a mano | Empieza a recibir tráfico en cuanto se registra, sin tocar la ruta |
+| Qué pasa si esa instancia se cae | El Gateway le sigue enviando tráfico, y falla | El Gateway deja de enviarle tráfico en cuanto el registro la retira |
+| Quién decide qué instancia atiende cada petición | Nadie decide — siempre la misma, fija en la ruta | El balanceador de carga, con el algoritmo elegido (arriba) |
+
+**Tabla 3. Antes y después del punto único de acceso**
+
+| | Sin Gateway (hasta S3) | Con Gateway (desde hoy) |
+|---|---|---|
+| Dirección que conoce el cliente | Una por instancia (`:8080`, `:8081`, ...) | Una sola, fija |
+| Qué pasa si una instancia se cae | El cliente que apuntaba ahí falla | El Gateway deja de enviarle tráfico; el cliente no lo nota |
+| Qué pasa si se agrega una instancia nueva | Ningún cliente existente la usa, a menos que se actualice a mano | El Gateway empieza a repartirle tráfico también, sin cambios en el cliente |
+| Quién decide a qué instancia va cada petición | El propio cliente (a mano, escribiendo el puerto) | El balanceador de carga, automáticamente |
+
+## 3. Aplica: actividad práctica guiada
+
+Tiempo: 2h.
+
+**Actividad:** construcción guiada de `consolas-gateway`, con rutas hacia `consolas-catalogo-ms` resueltas por descubrimiento y balanceo de carga verificado entre sus dos instancias (Producto de la sesión en 1.4).
+
+**Propósito de la actividad:** que un cliente externo llame siempre a la misma dirección, sin conocer cuántas instancias de `consolas-catalogo-ms` existen ni en qué puerto responde cada una, verificando con evidencia real que el tráfico se reparte entre ellas.
+
+**Orientaciones metodológicas:** en el laboratorio, el docente construye `consolas-gateway` paso a paso frente a la clase, verificando cada ruta antes de avanzar; los estudiantes replican cada paso en su propio equipo, con las dos instancias de `consolas-catalogo-ms` (S3) ya corriendo antes de empezar.
+
+**Actividades para realizar:**
+
+- **3.1** Verificar el punto de partida.
+- **3.2** Crear el proyecto `consolas-gateway`.
+- **3.3** Configurar `consolas-gateway` como Config Client.
+- **3.4** Crear la configuración de `consolas-gateway` en `config-repo`, con sus rutas.
+- **3.5** Probar `consolas-gateway` en DEV.
+- **3.6** Verificar balanceo de carga entre instancias.
+- **3.7** (opcional, anexo) Grafana sobre Prometheus y Loki.
+- **3.7.1** (opcional) Exponer métricas de `consolas-gateway` para Prometheus.
+- **3.8** (opcional, anexo) Tablero y alertas de infraestructura.
+- **3.9** (opcional, anexo) Métricas de negocio con Micrometer.
+- **3.10** (opcional, anexo) Diseñar el tablero de catálogo en tiempo real.
+- **3.11** (opcional, anexo) Guardar los tableros como código.
+- **3.12** (opcional) Punto único de acceso en producción local.
+
+### 3.1 Verificar el punto de partida
+
+**Punto de partida común:** todo el equipo debe comenzar exactamente desde el mismo estado, no desde su propio avance individual. Clona la rama `s03-registro-descubrimiento` (el snapshot de cierre de S3 — incluye `consolas-eureka` y `consolas-catalogo-ms` registrado):
+
+```bash
+git clone --branch s03-registro-descubrimiento https://github.com/262dist/consolas.git
+```
+
+**Producto del paso:** confirmación de que `consolas-config`, `consolas-eureka` y dos instancias de `consolas-catalogo-ms` siguen registrándose en DEV, antes de tocar código nuevo.
+
+**Requisito antes de continuar:**
+
+```powershell
+cd infra/consolas-config
+.\mvnw.cmd spring-boot:run
+```
+
+En otra terminal:
+
+```powershell
+cd infra/consolas-eureka
+.\mvnw.cmd spring-boot:run
+```
+
+En dos terminales más, una instancia en cada una (mismo mecanismo de S3, 3.9):
+
+```powershell
+cd services/consolas-catalogo-ms
+docker compose -f compose-dev.yml up -d
+.\mvnw.cmd spring-boot:run
+```
+
+```powershell
+cd services/consolas-catalogo-ms
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--server.port=8081"
+```
+
+Confirma que `http://localhost:18761` muestra dos instancias de `PAGATU-CATALOGO-MS`, ambas `UP`. Si falla, el problema es anterior a esta sesión (S1-S3), no de los pasos 3.2 en adelante.
+
+### 3.2 Crear el proyecto `consolas-gateway`
+
+**Producto del paso:** proyecto Spring Boot `consolas-gateway` creado dentro de `infra/consolas-gateway`.
+
+Desde VS Code, usa Spring Initializr (`Spring Initializr: Create a Maven Project`):
+
+**Tabla 4. Configuración del proyecto `consolas-gateway` en Spring Initializr**
+
+| Campo | Valor |
+|---|---|
+| Project | Maven Project |
+| Spring Boot | La última estable que ofrezca Spring Initializr en ese momento (verificado: **4.1.1**, alineado con `consolas-catalogo-ms` desde S1) |
+| Language | Java |
+| Group Id | `pe.edu.upeu` |
+| Artifact Id | `consolas-gateway` |
+| Package name | `pe.edu.upeu.gateway` |
+| Packaging | Jar |
+| Java | 21 |
+| Ubicación sugerente | `infra/consolas-gateway` |
+
+Dependencias a seleccionar:
+
+**Tabla 5. Dependencias del proyecto `consolas-gateway`**
+
+| Grupo | Dependencias | Propósito |
+|---|---|---|
+| Spring Cloud Routing | Gateway | Enrutamiento y balanceo de carga (2.2, 2.3) |
+| Spring Cloud | Config Client | Leer configuración desde `consolas-config` |
+| Spring Cloud Discovery | Eureka Discovery Client | Resolver `lb://` contra `consolas-eureka` |
+| Ops | Spring Boot Actuator | Verificar health de `consolas-gateway` |
+| Productividad | Spring Boot DevTools | Facilitar ejecución en desarrollo |
+
+En `pom.xml`, las dependencias clave:
+
+```xml
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-gateway-server-webmvc</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+</dependency>
+```
+
+`-server-webmvc`, no `-server-webflux`: desde Spring Cloud 2025.0.0 existen dos paquetes de Gateway independientes — `spring-cloud-starter-gateway-server-webmvc` (servlet, bloqueante, Tomcat) y `spring-cloud-starter-gateway-server-webflux` (reactivo, no bloqueante, Netty). Todos los servicios de `consolas` (`consolas-catalogo-ms`, S1-S2) usan `spring-boot-starter-web` — MVC clásico sobre Tomcat —, así que el Gateway debe usar el mismo modelo de concurrencia; mezclar `-webflux` obligaría a traer Netty/Reactor solo para este componente sin ninguna necesidad real.
+
+Mismo BOM de Spring Cloud que ya usan `consolas-config` y `consolas-eureka` (S2, S3) — Spring Initializr elige la versión compatible con la versión de Spring Boot seleccionada:
+
+```xml
+<properties>
+    <java.version>21</java.version>
+    <spring-cloud.version>2025.1.3</spring-cloud.version>
+</properties>
+
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-dependencies</artifactId>
+            <version>${spring-cloud.version}</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
+`consolas-gateway` no necesita ninguna clase ni anotación adicional más allá de la que Spring Initializr ya genera (`@SpringBootApplication`) — a diferencia de `consolas-eureka` (S3, 3.3), que sí necesitaba `@EnableEurekaServer` para activarse como servidor. Gateway y descubrimiento se activan solos por la sola presencia de las dependencias en el `pom.xml`; todo el comportamiento real se define en configuración (3.4), no en código.
+
+### 3.3 Configurar `consolas-gateway` como Config Client
+
+**Producto del paso:** `consolas-gateway` preparado para leer su propia configuración desde `consolas-config` — el mismo patrón que ya siguen `consolas-catalogo-ms` (S2) y `consolas-eureka` (S3).
+
+En `infra/consolas-gateway/src/main/resources/application.yml`:
+
+```yaml
+spring:
+  application:
+    name: consolas-gateway
+  profiles:
+    active: dev
+  config:
+    import: "optional:configserver:${CONFIG_SERVER_URL:http://localhost:18888}"
+```
+
+### 3.4 Crear la configuración de `consolas-gateway` en `config-repo`, con sus rutas
+
+**Producto del paso:** `consolas-gateway-dev.yml` y `consolas-gateway-prod.yml` en `config-repo`, con las rutas hacia `consolas-catalogo-ms`.
+
+**`config-repo/consolas-gateway-dev.yml`:**
+
+```yaml
+server:
+  port: 18080
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: consolas-catalogo-categorias
+              uri: lb://consolas-catalogo-ms
+              predicates:
+                - Path=/api/v1/categorias/**
+            - id: consolas-catalogo-productos
+              uri: lb://consolas-catalogo-ms
+              predicates:
+                - Path=/api/v1/productos/**
+
+eureka:
+  instance:
+    hostname: localhost
+    instance-id: ${spring.application.name}:${server.port}
+  client:
+    service-url:
+      defaultZone: http://localhost:18761/eureka
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+```
+
+`18080`, no `8080`: el puerto natural de un Gateway suele ser `8080`, pero ese ya lo usa la primera instancia de `consolas-catalogo-ms` (S1-S3). Mismo criterio que `consolas-config` (`8888` → `18888`) y `consolas-eureka` (`8761` → `18761`): en DEV, el prefijo `1` evita el choque con los puertos que los microservicios ya tienen fijos.
+
+Dos rutas, no una — `consolas-catalogo-ms` expone dos recursos (`/api/v1/categorias`, `/api/v1/productos`, S1-S2), y cada uno necesita su propio `predicates: Path`, aunque las dos apunten al mismo `uri: lb://consolas-catalogo-ms`: el Gateway no agrupa rutas por servicio de destino, las agrupa por el patrón de entrada.
+
+**`config-repo/consolas-gateway-prod.yml`:**
+
+```yaml
+server:
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: consolas-catalogo-categorias
+              uri: lb://consolas-catalogo-ms
+              predicates:
+                - Path=/api/v1/categorias/**
+            - id: consolas-catalogo-productos
+              uri: lb://consolas-catalogo-ms
+              predicates:
+                - Path=/api/v1/productos/**
+
+eureka:
+  instance:
+    instance-id: ${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: http://consolas-eureka:8761/eureka
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: never
+```
+
+En PROD, `consolas-gateway` sí usa el puerto natural `8080` (dentro de su propio contenedor, sin choque posible con otros servicios — cada uno vive en su propia red interna) — el mismo criterio que ya siguen `consolas-config` y `consolas-eureka` desde 3.15 de S3.
+
+### 3.5 Probar `consolas-gateway` en DEV
+
+**Producto del paso:** evidencia de que las rutas resuelven correctamente a través del punto único de acceso.
+
+Con `consolas-config`, `consolas-eureka` y las dos instancias de `consolas-catalogo-ms` ya corriendo (3.1), en una nueva terminal:
+
+```powershell
+cd infra/consolas-gateway
+.\mvnw.cmd spring-boot:run
+```
+
+Confirma que se registra en el dashboard:
+
+```text
+http://localhost:18761
+```
+
+Resultado esperado: aparece `PAGATU-GATEWAY` junto a `PAGATU-CATALOGO-MS`, ambos `UP` — el Gateway también es un cliente de Eureka (2.2), necesita el registro tanto como cualquier otro componente.
+
+Prueba las rutas, **sin usar `8080` ni `8081`**, solo el puerto del Gateway:
+
+PowerShell:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:18080/api/v1/categorias"
+Invoke-RestMethod -Method Get -Uri "http://localhost:18080/api/v1/productos"
+```
+
+bash macOS/Linux:
+
+```bash
+curl http://localhost:18080/api/v1/categorias
+curl http://localhost:18080/api/v1/productos
+```
+
+Resultado esperado: la misma respuesta que ya conoces desde S1-S2, ahora obtenida sin escribir ningún puerto de instancia — solo el puerto fijo y único del Gateway.
+
+**Error frecuente**: probar una ruta que no coincide con ningún `Path` configurado (por ejemplo, `http://localhost:18080/categorias`, sin el prefijo `/api/v1`). El Gateway responde `404`, no porque `consolas-catalogo-ms` esté caído, sino porque ninguna ruta reclama esa URL — el error está en la definición de la ruta (3.4), no en el servicio de destino.
+
+### 3.6 Verificar balanceo de carga entre instancias
+
+**Producto del paso:** evidencia de que peticiones consecutivas, idénticas, se resuelven contra instancias distintas.
+
+Ten a la vista las dos consolas donde corren las instancias de `consolas-catalogo-ms` (`8080` y `8081`). Ejecuta varias veces seguidas, sin pausa, la misma petición a través del Gateway:
+
+```powershell
+1..4 | ForEach-Object { Invoke-RestMethod -Method Get -Uri "http://localhost:18080/api/v1/categorias" | Out-Null; "Petición $_ enviada" }
+```
+
+```bash
+for i in 1 2 3 4; do curl -s -o /dev/null http://localhost:18080/api/v1/categorias; echo "Petición $i enviada"; done
+```
+
+Revisa ambas consolas de `consolas-catalogo-ms`: cada una debe mostrar líneas de log nuevas por **algunas** de las cuatro peticiones, no todas por la misma instancia — esa alternancia es la evidencia del balanceo *round-robin* (2.3), no algo que se vea en la respuesta HTTP (ambas instancias devuelven exactamente los mismos datos, porque comparten la misma base de datos).
+
+**Tabla 6. Verificación de balanceo de carga antes de continuar**
+
+| Verificación | Resultado esperado |
+|---|---|
+| `GET /api/v1/categorias` vía Gateway (`18080`) | `200 OK`, igual que antes vía `8080`/`8081` directo |
+| Consola de la instancia `8080` | Recibe algunas de las peticiones consecutivas, no todas |
+| Consola de la instancia `8081` | Recibe el resto de las peticiones, no cero |
+| Detener una instancia (Ctrl+C) y repetir las peticiones | El Gateway sigue respondiendo `200`, ahora siempre desde la instancia que queda viva |
+
+El último caso de la Tabla 6 es la prueba real del punto único de acceso: el cliente nunca se entera de que una instancia se cayó — sigue llamando a la misma dirección, y el Gateway deja de enviarle tráfico a la instancia caída en cuanto `consolas-eureka` la retira del registro (S3, heartbeat).
+
+### 3.7 (opcional, anexo) Grafana sobre Prometheus y Loki
+
+!!! note "3.7 es opcional"
+    Depende de 3.10-3.14 de S3: sin Prometheus ni Loki corriendo, Grafana no tiene qué mostrar. El alcance evaluado de S4 termina en 3.6 (4.4, 4.6); este paso es para quien ya tiene ambos en pie y quiere verlos juntos en un solo tablero.
+
+**Producto del paso:** un Grafana propio, con Prometheus y Loki agregados como fuentes de datos automáticamente, corriendo en paralelo al resto del stack.
+
+**Figura 9. Grafana y sus conexiones**
+
+```mermaid
+flowchart TB
+    Usuario["Usuario<br/>navegador"]
+
+    subgraph Grafana["consolas-grafana<br/>(puerto 13000)"]
+        DS1["Data source: Prometheus"]
+        DS2["Data source: Loki"]
+    end
+
+    Prometheus["consolas-prometheus<br/>(puerto 19090)"]
+    Loki["consolas-loki<br/>(puerto 13100)"]
+    Eureka["consolas-eureka<br/>(S3)"]
+    Promtail["consolas-promtail<br/>(S3)"]
+
+    I1["consolas-catalogo-ms<br/>instancia 1, puerto 8080"]
+    I2["consolas-catalogo-ms<br/>instancia 2, puerto 8081"]
+
+    Usuario -->|"consulta tableros"| Grafana
+    DS1 -->|"PromQL"| Prometheus
+    DS2 -->|"LogQL"| Loki
+
+    Prometheus -->|"eureka_sd_configs: ¿qué instancias existen?"| Eureka
+    Prometheus -->|"scrape /actuator/prometheus cada 15s"| I1
+    Prometheus -->|"scrape /actuator/prometheus cada 15s"| I2
+
+    Promtail -->|"lee logs de"| I1
+    Promtail -->|"lee logs de"| I2
+    Promtail -->|"push"| Loki
+```
+
+Grafana no recibe datos directamente de `consolas-catalogo-ms`: siempre pasa por Prometheus (métricas) o Loki (logs) — nunca consulta un microservicio de negocio. `consolas-prometheus` sigue descubriendo instancias a través de `consolas-eureka` (S3, 3.11) — Grafana no agrega ningún mecanismo nuevo de descubrimiento, solo une lo que Prometheus y Loki ya recolectan por separado en un mismo tablero.
+
+**Figura 10. Grafana en producción (puerto reservado, no construido en este anexo)**
+
+```mermaid
+flowchart TB
+    Usuario["Usuario<br/>navegador"]
+
+    subgraph Docker["Docker Network: consolas-prod-net"]
+        subgraph Grafana["consolas-grafana<br/>host: localhost:23000 (reservado)"]
+            DS1["Data source: Prometheus"]
+            DS2["Data source: Loki"]
+        end
+
+        Prometheus["consolas-prometheus<br/>host: localhost:29090 (S3)"]
+        Loki["consolas-loki<br/>host: localhost:23100 (S3)"]
+        Eureka["consolas-eureka<br/>(S2, S3)"]
+        Promtail["consolas-promtail<br/>(S3)"]
+        Gateway["consolas-gateway<br/>host: localhost:28080 (3.12)"]
+
+        I1["consolas-catalogo-ms<br/>réplica, instance-id aleatorio"]
+        I2["consolas-catalogo-ms<br/>réplica, instance-id aleatorio"]
+    end
+
+    Usuario -->|"localhost:23000"| Grafana
+    DS1 -->|"PromQL"| Prometheus
+    DS2 -->|"LogQL"| Loki
+
+    Prometheus -->|"eureka_sd_configs"| Eureka
+    Prometheus -->|"scrape /actuator/prometheus"| I1
+    Prometheus -->|"scrape /actuator/prometheus"| I2
+    Prometheus -->|"scrape /actuator/prometheus"| Gateway
+
+    Promtail -->|"lee logs de"| I1
+    Promtail -->|"lee logs de"| I2
+    Promtail -->|"push"| Loki
+```
+
+Mismo esquema que la Figura 9 — la diferencia no es de conexiones, es de red y de puertos: en DEV, cada herramienta corre suelta en el host (`host.docker.internal`, prefijo `1`); en PROD, todo vive dentro de `consolas-prod-net` y se habla por nombre de servicio (S3, 3.15), con el prefijo `2` reservado para PROD (`23000`, `29090`, `23100`) y `instance-id` aleatorio para las réplicas de `consolas-catalogo-ms` (3.9 de S3) en vez del puerto fijo de DEV. `consolas-gateway` (3.12) sí expone métricas propias en este anexo (3.7.1) — a diferencia de `consolas-config`/`consolas-eureka` (S3, 3.10-3.11), `consolas-gateway` ya se registra en Eureka, así que el mismo `eureka_sd_configs` que descubre a `consolas-catalogo-ms` lo descubre también, sin ningún target estático que agregar.
+
+Crea `obs/grafana/provisioning/datasources/datasources-dev.yml`:
+
+```yaml
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://consolas-prometheus:9090
+    isDefault: true
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://consolas-loki:3100
+```
+
+`url` usa el nombre del servicio de Docker Compose (`consolas-prometheus`, `consolas-loki`, S3), no `localhost` — misma razón que `prometheus-dev.yml` usa `host.docker.internal` para llegar a `consolas-catalogo-ms`, que corre fuera de Docker (S3, 3.11).
+
+Agrega Grafana a `obs/compose-dev.yml` (junto a `consolas-prometheus`, `consolas-loki` y `consolas-promtail`, S3):
+
+```yaml
+  consolas-grafana:
+    image: grafana/grafana:11.4.0
+    container_name: consolas-grafana-dev
+    restart: unless-stopped
+    ports:
+      - "13000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - consolas-prometheus
+      - consolas-loki
+```
+
+`13000` sigue el mismo criterio de puertos que Prometheus (`19090`) y Loki (`13100`, S3): el prefijo `1` identifica a DIST DEV, dejando `23000` reservado para un futuro Grafana de PROD, con el mismo criterio con el que S3 reservó `29090`/`23100`.
+
+Vuelve a levantar el stack:
+
+```bash
+cd obs
+docker compose -f compose-dev.yml up -d
+```
+
+Abre `http://localhost:13000` (usuario `admin`, contraseña `admin`). Ve a **Connections → Data sources** y confirma que `Prometheus` y `Loki` ya aparecen configurados, sin haberlos agregado a mano.
+
+Crea un panel nuevo (**Dashboards → New → New dashboard → Add visualization**) y prueba una consulta de cada fuente:
+
+- Con `Prometheus`: `up{job="consolas-microservicios"}` (S3, 3.12) — confirma que `consolas-catalogo-ms` sigue con sus instancias arriba.
+- Con `Loki`: `{application="consolas-catalogo-ms"}` (S3, 3.14) — logs recientes del servicio.
+
+Lo que cambia no es el dato ni la consulta — es tener métricas y logs en el mismo tablero, algo que ni Prometheus ni Loki ofrecen por separado. Los pasos siguientes (3.8-3.11) construyen un tablero real sobre esta base, no solo un panel de prueba.
+
+#### 3.7.1 (opcional) Exponer métricas de `consolas-gateway` para Prometheus
+
+**Producto del paso:** `consolas-gateway` visible en Prometheus junto a `consolas-catalogo-ms` — el punto único de acceso también se monitorea, no solo lo que hay detrás de él.
+
+Agrega la dependencia en `infra/consolas-gateway/pom.xml`:
+
+```xml
+<dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-registry-prometheus</artifactId>
+    <scope>runtime</scope>
+</dependency>
+```
+
+En `config-repo/consolas-gateway-dev.yml`, agrega `prometheus` a los endpoints ya expuestos:
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+```
+
+Reinicia `consolas-gateway` y verifica:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:18080/actuator/prometheus"
+```
+
+No hace falta tocar `obs/prometheus/prometheus-dev.yml` (S3, 3.11) ni agregar ningún target estático: `consolas-gateway` ya se registra en `consolas-eureka` (3.4, `eureka:` en su propia configuración) para poder resolver `lb://` — el mismo `eureka_sd_configs` que ya descubre a `consolas-catalogo-ms` lo descubre a él también, apenas expone el endpoint. Esto es justo lo que distingue a `consolas-gateway` de `consolas-config`/`consolas-eureka` (S3, 3.10-3.11): esos dos sí necesitaron un target estático a mano, porque ninguno se registra como cliente de Eureka.
+
+Confirma en `http://localhost:19090/targets` (S3, 3.12): ahora deberían verse tres entradas bajo el job `consolas-microservicios` — las dos instancias de `consolas-catalogo-ms` más `consolas-gateway` —, además de los dos targets estáticos de `consolas-config`/`consolas-eureka` (S3).
+
+**(Opcional dentro de lo opcional) Repite en PROD** — agrega la misma dependencia (ya la tiene si seguiste este paso) y `prometheus` en `config-repo/consolas-gateway-prod.yml`; `obs/prometheus/prometheus.yml` (S3, 3.15) tampoco necesita cambios, por la misma razón: `consolas-gateway` se descubre solo.
+
+### 3.8 (opcional, anexo) Tablero y alertas de infraestructura
+
+**Producto del paso:** un tablero de infraestructura con las métricas y los logs que ya construiste en S3 (3.12-3.14) — ahora visualizados en Grafana, no solo consultados por API —, más alertas que avisan solas cuando algo falla.
+
+Antes de construir nada de negocio (3.9-3.10), lo primero que un equipo real pone en un tablero es la salud de lo que ya tiene corriendo. Ninguna de las consultas de este paso es nueva: son exactamente las que S3 ya verificó por API o por navegador; lo único distinto es que ahora quedan visibles todo el tiempo, en un tablero, no una vez, en una terminal.
+
+**Cómo se agrega cada panel (primera vez en Grafana, sigue estos pasos para los seis paneles):**
+
+1. Abre `http://localhost:13000`. En el menú de la izquierda, entra a **Dashboards** → botón **New** (arriba a la derecha) → **New dashboard**.
+2. Clic en **+ Add visualization**. En el diálogo que aparece, elige la fuente de datos: `Prometheus` para métricas, `Loki` para logs.
+3. Se abre el editor de panel. En el campo de consulta, debajo del gráfico, pega la consulta del panel.
+4. A la derecha del editor, en **Panel options → Title**, escribe el título del panel (por ejemplo, "Instancias activas").
+5. Justo arriba de **Panel options**, hay un selector de tipo de visualización — cámbialo a **Stat**, **Time series** o **Logs**, según lo que indica cada panel.
+6. Clic en **Save** (arriba a la derecha del editor) para volver al tablero, ya con el panel agregado.
+7. Para el siguiente panel, desde la vista del tablero, clic en **+ Add** (arriba) → **Visualization**, y repite desde el paso 2.
+
+**Panel 1 — Instancias activas de `consolas-catalogo-ms` (Stat):**
+
+```promql
+up{job="consolas-microservicios"}
+```
+
+Con las dos instancias corriendo (3.1), este panel muestra dos series — una por instancia — en vez de un único valor: es la primera señal visual de que el sistema es distribuido, no un solo proceso.
+
+**Panel 2 — Peticiones HTTP por segundo, por instancia (Time series):**
+
+```promql
+sum by (instance) (rate(http_server_requests_seconds_count{job="consolas-microservicios"}[1m]))
+```
+
+`sum by (instance)` separa la serie por cada instancia descubierta vía Eureka — el panel que hace visible, sin adivinar, lo que 3.6 verificó a mano con peticiones consecutivas: si el balanceo reparte tráfico parejo, las dos líneas suben juntas; si una instancia concentra todo, salta a la vista.
+
+**Panel 3 — Conexiones a PostgreSQL (Time series, dos consultas en el mismo panel):**
+
+```promql
+hikaricp_connections_active
+hikaricp_connections_max
+```
+
+**Panel 4 — Peticiones al Gateway (Time series):**
+
+```promql
+rate(http_server_requests_seconds_count{job="consolas-microservicios", uri=~"/api/v1/.*"}[1m])
+```
+
+Filtra a las rutas que expone `consolas-gateway` (3.4) — el mismo tráfico que ya cruzaste manualmente en 3.5-3.6, ahora como serie continua.
+
+**Panel 5 — Logs recientes (Logs, fuente `Loki`):**
+
+```logql
+{application="consolas-catalogo-ms"}
+```
+
+**Panel 6 — Errores recientes (Logs, fuente `Loki`):**
+
+```logql
+{application="consolas-catalogo-ms", detected_level="error"}
+```
+
+Guarda el tablero con el nombre `Pagatu - Infraestructura` — distinto del tablero de negocio que construye 3.10.
+
+**Buscar una línea específica, sin pegar URLs a mano: `Explore`.** S3 (3.14) encontró líneas puntuales pegando la consulta directo en la URL del navegador contra la API de Loki — funciona, pero es incómodo para explorar: cada búsqueda nueva significa editar la URL a mano. Grafana tiene una herramienta dedicada justo para esto:
+
+1. En el menú de la izquierda, entra a **Explore** (ícono de brújula).
+2. Elige la fuente `Loki` en el selector de arriba.
+3. En el campo de consulta, pega el mismo LogQL que ya usaste por API — por ejemplo, para confirmar el arranque de una instancia (S3, 3.14):
+
+```logql
+{application="consolas-catalogo-ms"} |= "Started PagatuCatalogoMsApplication"
+```
+
+4. Clic en **Run query** (o Ctrl+Enter). Las líneas que contienen el texto buscado aparecen resaltadas, con el término marcado — la misma "aguja en el pajar" que antes tenías que encontrar leyendo el JSON crudo de la API.
+
+Prueba también el pool de conexiones (S3, 3.14), con la misma mecánica, solo cambiando el texto buscado:
+
+```logql
+{application="consolas-catalogo-ms"} |= "HikariPool"
+```
+
+`Explore` no reemplaza los paneles del tablero (arriba): un panel muestra siempre lo mismo, para cualquiera que abra el tablero; `Explore` es para preguntas puntuales, del momento — la herramienta correcta cuando no sabes de antemano qué vas a buscar, en vez de crear un panel nuevo por cada búsqueda.
+
+**Alertas: que Grafana avise, no que alguien tenga que quedarse mirando el tablero.** Un tablero sirve mientras alguien lo está viendo; una alerta sigue funcionando aunque nadie lo mire.
+
+**Cómo se crea cada regla de alerta (sigue estos pasos para las dos alertas):**
+
+1. En el menú de la izquierda, entra a **Alerting** → **Alert rules** → botón **+ New alert rule** (arriba a la derecha).
+2. En **Enter alert rule name**, escribe el nombre de la regla (por ejemplo, "Instancia caída").
+3. En **Define query and alert condition**, confirma que la fuente sea `Prometheus` y pega la consulta en el editor de la consulta **A**.
+4. Debajo, en la pestaña **Threshold**, define la condición: elige el operador (`IS BELOW` o `IS ABOVE`, según la alerta) y escribe el valor.
+5. En **Set evaluation behavior**, crea una carpeta nueva escribiendo su nombre (por ejemplo, `Pagatu`) y un grupo de evaluación; en **Evaluate every** define cada cuánto se revisa la condición, y en **for**, cuánto tiempo debe sostenerse antes de pasar a *Firing*.
+6. Sin tocar **Configure labels and notifications** (queda sin *contact point* por ahora, ver más abajo), clic en **Save rule and exit** (arriba a la derecha).
+
+**Alerta 1 — Instancia caída:**
+
+- Consulta (fuente `Prometheus`): `up{job="consolas-microservicios"}`
+- Condición: `IS BELOW 1`
+- Evaluar cada `10s`, durante (`for`) `1m` antes de pasar a *Firing* — evita que una caída de un segundo (un reinicio normal) dispare la alerta de más. Con dos instancias, esta alerta puede dispararse mientras la otra sigue respondiendo — es justo lo que el balanceo de S4 existe para evitar a nivel de servicio, pero el equipo igual necesita saber que una cayó.
+
+**Alerta 2 — Pool de conexiones cerca del límite:**
+
+- Consulta (fuente `Prometheus`): `hikaricp_connections_active / hikaricp_connections_max`
+- Condición: `IS ABOVE 0.8`
+- Evaluar cada `30s`, durante `2m`.
+
+Sin *contact point* configurado, la alerta igual cambia de estado (*Normal* → *Pending* → *Firing*) y queda visible en **Alerting → Alert rules**, que alcanza para esta sesión. Conectar un canal real de notificación (correo, Slack) queda fuera de este anexo.
+
+**Prueba la Alerta 1 provocándola de verdad:** detén una de las dos instancias de `consolas-catalogo-ms` (`Ctrl+C` en su terminal) y observa el estado de la regla en **Alerting → Alert rules** — debería pasar de *Normal* a *Pending* y, pasado el minuto configurado, a *Firing*, aunque el Gateway (3.6) siga respondiendo con la instancia restante. Vuelve a levantar la instancia y confirma que regresa sola a *Normal*.
+
+### 3.9 (opcional, anexo) Métricas de negocio con Micrometer
+
+Con la infraestructura ya en su propio tablero y con alertas (3.8), esta es la pieza que le falta al negocio: métricas propias de lo que la aplicación hace, no de cómo está corriendo.
+
+**Producto del paso:** `consolas-catalogo-ms` emitiendo métricas propias del catálogo, listas para Prometheus.
+
+`up{job="consolas-microservicios"}` o `hikaricp_connections_active` (3.8) dicen si el servicio está vivo y cuántas conexiones usa — nada sobre cuántos productos se crearon ni cuántas búsquedas fallaron por recurso inexistente. Esas preguntas no las responde ninguna métrica que Spring Boot exponga por defecto: hay que emitirlas explícitamente, en el momento exacto en que el evento de negocio ocurre.
+
+Agrega `MeterRegistry` a `ProductoService` (registra la creación de un producto):
+
+```java
+package pe.edu.upeu.catalogo.service;
+
+import pe.edu.upeu.catalogo.dto.ProductoRequest;
+import pe.edu.upeu.catalogo.dto.ProductoResponse;
+import pe.edu.upeu.catalogo.entity.Categoria;
+import pe.edu.upeu.catalogo.entity.Producto;
+import pe.edu.upeu.catalogo.exception.ResourceNotFoundException;
+import pe.edu.upeu.catalogo.mapper.ProductoMapper;
+import pe.edu.upeu.catalogo.repository.CategoriaRepository;
+import pe.edu.upeu.catalogo.repository.ProductoRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class ProductoService {
+
+    private final ProductoRepository productoRepository;
+    private final ProductoMapper productoMapper;
+    private final CategoriaRepository categoriaRepository;
+    private final MeterRegistry meterRegistry;
+
+    // ... listar(), obtener(), actualizar(), eliminar() sin cambios ...
+
+    public ProductoResponse crear(ProductoRequest request) {
+        Producto producto = productoMapper.toEntity(request);
+        producto.setCategoria(buscarCategoriaOFallar(request.getCategoriaId()));
+        ProductoResponse response = productoMapper.toResponse(productoRepository.save(producto));
+        meterRegistry.counter("consolas_productos_creados_total").increment();
+        return response;
+    }
+
+    private Producto buscarOFallar(Long id) {
+        return productoRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado: " + id));
+    }
+
+    private Categoria buscarCategoriaOFallar(Long categoriaId) {
+        return categoriaRepository.findById(categoriaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Categoria no encontrada: " + categoriaId));
+    }
+}
+```
+
+Solo se agregó el campo `meterRegistry` (Spring lo inyecta solo: `micrometer-registry-prometheus` ya está en el `pom.xml` desde S3, 3.10) y una línea al final de `crear()` — el resto de la clase no cambia. `counter(...).increment()` suma uno cada vez que se llama; Prometheus lo expone como `consolas_productos_creados_total`.
+
+Registra la búsqueda fallida en `GlobalExceptionHandler` — un solo lugar captura **todas** las búsquedas por recurso inexistente, sin importar si el `id` era de una categoría o de un producto:
+
+```java
+package pe.edu.upeu.catalogo.exception;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
+
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+
+@RestControllerAdvice
+@RequiredArgsConstructor
+public class GlobalExceptionHandler {
+
+    private final MeterRegistry meterRegistry;
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNotFound(ResourceNotFoundException ex) {
+        String recurso = ex.getMessage().split(" ")[0].toLowerCase();
+        meterRegistry.counter("consolas_recursos_no_encontrados_total", "recurso", recurso).increment();
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", Instant.now().toString());
+        body.put("status", HttpStatus.NOT_FOUND.value());
+        body.put("error", "Not Found");
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    // ... handleValidation() sin cambios ...
+}
+```
+
+El `"recurso"` como etiqueta (*tag*) — tomado de la primera palabra del mensaje, `"Producto"` o `"Categoria"` (3.5.4, 3.5.8) —, no como parte del nombre de la métrica, es lo que permite en 3.10 desglosar búsquedas fallidas por tipo de recurso sin crear una métrica nueva por cada una.
+
+Reinicia las dos instancias de `consolas-catalogo-ms`, genera al menos tres productos nuevos (`POST /api/v1/productos`, S1) y al menos una búsqueda a un `id` inexistente de cada recurso, y verifica que las métricas nuevas aparezcan:
+
+```powershell
+(Invoke-RestMethod -Uri "http://localhost:8081/actuator/prometheus") -match "consolas_"
+```
+
+Resultado esperado: líneas con `consolas_productos_creados_total` y `consolas_recursos_no_encontrados_total{recurso="producto",...}` / `{recurso="categoria",...}`.
+
+### 3.10 (opcional, anexo) Diseñar el tablero de catálogo en tiempo real
+
+**Producto del paso:** un tablero de Grafana con el catálogo en vivo — productos creados por minuto y búsquedas fallidas por recurso —, actualizándose solo.
+
+Abre `http://localhost:13000` (3.7, más arriba) y crea un tablero **nuevo**, distinto del de infraestructura (3.8): **Dashboards → New → New dashboard**. Cada panel se agrega con **Add visualization**, eligiendo la fuente `Prometheus`, pegando la consulta, y ajustando el tipo de visualización a la derecha.
+
+**Panel 1 — Productos creados por minuto (Time series):**
+
+```promql
+rate(consolas_productos_creados_total[1m]) * 60
+```
+
+`rate()` calcula la velocidad de crecimiento del contador por segundo, dentro de la ventana `[1m]`; multiplicar por `60` la convierte a "productos por minuto", una unidad que se lee de un vistazo.
+
+**Panel 2 — Total de productos creados, últimos 5 minutos (Stat):**
+
+```promql
+increase(consolas_productos_creados_total[5m])
+```
+
+`increase()` es `rate()` sin normalizar a "por segundo" — directamente cuánto creció el contador dentro de la ventana.
+
+**Panel 3 — Búsquedas fallidas por recurso (Bar gauge):**
+
+```promql
+sum by (recurso) (consolas_recursos_no_encontrados_total)
+```
+
+`sum by (recurso)` agrupa por la etiqueta agregada en 3.9 — con dos recursos hoy (`producto`, `categoria`), el panel ya muestra dos barras; queda listo para un tercer recurso sin cambiar la consulta.
+
+**Actualización casi en vivo:** en la esquina superior derecha del tablero, abre el selector de rango de tiempo y elige **Last 30 minutes**; al lado, en el selector de refresco, escribe `10s`. Con eso el tablero vuelve a consultar Prometheus cada 10 segundos — coherente con las ventanas `[1m]`/`[5m]` de las consultas: un refresco más lento que la ventana haría que el tablero se sintiera desactualizado; uno mucho más rápido no aporta nada, porque Prometheus solo tiene datos nuevos cada 15 segundos (el `scrape_interval` de `prometheus-dev.yml`).
+
+Guarda el tablero con el nombre `Pagatu - Catálogo en tiempo real`.
+
+**Negocio e infraestructura, uno al lado del otro:** con los dos tableros abiertos en pestañas distintas — `Pagatu - Infraestructura` (3.8) y `Pagatu - Catálogo en tiempo real` (arriba) —, un salto en "Búsquedas fallidas por recurso" se explica mirando, en el mismo rango de tiempo, el panel de errores del tablero de infraestructura. Es la misma correlación métricas-logs de S3 (3.14), ahora visible sin cambiar de herramienta ni escribir una consulta nueva — solo cambiando de pestaña.
+
+### 3.11 (opcional, anexo) Guardar los tableros como código
+
+**Producto del paso:** los dos tableros (3.8 y 3.10) provisionados automáticamente, igual que ya están las fuentes de datos (3.7) — sobreviven a un `docker compose down` sin reconstruirlos a mano.
+
+Exporta el JSON de cada tablero por separado: ícono de engranaje (**Dashboard settings**) → **JSON Model** → copia el contenido completo. Guarda cada uno con su propio nombre:
+
+- `obs/grafana/provisioning/dashboards/consolas-infraestructura.json` (3.8)
+- `obs/grafana/provisioning/dashboards/consolas-catalogo.json` (3.10)
+
+Las reglas de alerta (3.8) se exportan aparte, desde **Alerting → Alert rules**, con el mismo ícono de exportar de cada regla; guárdalas como `obs/grafana/provisioning/alerting/consolas-alertas-dev.yml` si quieres que también se autoprovisionen — opcional, no imprescindible para esta sesión.
+
+Crea `obs/grafana/provisioning/dashboards/dashboards-dev.yml`:
+
+```yaml
+apiVersion: 1
+
+providers:
+  - name: Pagatu
+    folder: Pagatu
+    type: file
+    options:
+      path: /etc/grafana/provisioning/dashboards
+```
+
+Un único proveedor carga **todos** los archivos `.json` que encuentre en esa carpeta, sin necesitar una entrada por tablero. No hace falta agregar ningún volumen nuevo a `compose-dev.yml`: `./grafana/provisioning:/etc/grafana/provisioning:ro` (3.7, más arriba) ya monta toda la carpeta, incluidas estas subcarpetas nuevas.
+
+Reinicia el contenedor de Grafana y confirma que los dos tableros aparecen solos, en la carpeta `Pagatu`, sin haberlos importado a mano:
+
+```bash
+cd obs
+docker compose -f compose-dev.yml restart consolas-grafana
+```
+
+Con esto, el stack completo de observabilidad de DIST (Prometheus, Loki, Grafana, datasources y los dos tableros) queda como código en el repositorio — reproducible por cualquier integrante del equipo con un solo `docker compose up`, sin pasos manuales en la UI.
+
+### 3.12 (opcional) Punto único de acceso en producción local
+
+!!! note "3.12 es opcional"
+    El alcance evaluado de S4 termina en 3.6 (4.4, 4.6) — igual que 3.15 de S3, producción local con Docker es contenido adicional.
+
+**Producto del paso:** `consolas-gateway` operativo en Docker, dentro de la misma red compartida (`consolas-prod-net`, S2) — el único componente del sistema con un puerto expuesto al host.
+
+En `infra/compose.yml` (S3, 3.15), agrega:
+
+```yaml
+  consolas-gateway:
+    build:
+      context: ./consolas-gateway
+      dockerfile: Dockerfile
+    container_name: consolas-gateway
+    restart: unless-stopped
+    ports:
+      - "28080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      CONFIG_SERVER_URL: http://consolas-config:8888
+    depends_on:
+      consolas-config:
+        condition: service_healthy
+    networks:
+      - consolas-prod-net
+```
+
+`infra/consolas-gateway/Dockerfile`: mismo patrón multi-stage que `consolas-config` y `consolas-eureka` (S2, S3).
+
+`28080` es el único puerto de microservicio o infraestructura de negocio expuesto al host en todo `consolas-prod-net` — `consolas-catalogo-ms` ya lo tiene comentado desde S2 (`services/consolas-catalogo-ms/compose.yml`, `#ports: #  - "28080:8080"`... revisa que no choque con el de tu propio `consolas-gateway` si alguna vez lo descomentas). Esa es, precisamente, la idea del punto único de acceso llevada a producción: nadie fuera de `consolas-prod-net` necesita llegar directo a un microservicio — todos entran por `consolas-gateway`.
+
+Levanta:
+
+```bash
+cd infra
+docker compose up -d --build
+```
+
+Verifica:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:28080/api/v1/categorias"
+```
+
+**Evidencia de aprendizaje:**
+
+- `consolas-gateway` operativo en DEV, registrado en `consolas-eureka` y verificado en el dashboard.
+- Rutas hacia `consolas-catalogo-ms` (`/api/v1/categorias`, `/api/v1/productos`) resueltas por el Gateway, sin usar los puertos directos de las instancias.
+- Balanceo de carga verificado con peticiones consecutivas resueltas por instancias distintas.
+- (Opcional) Grafana con Prometheus y Loki como fuentes de datos, mostrando métricas y logs en un solo tablero.
+- (Opcional) Tablero de infraestructura con seis paneles y dos alertas configuradas y probadas.
+- (Opcional) Métricas de negocio propias (`consolas_productos_creados_total`, `consolas_recursos_no_encontrados_total`) emitidas por `consolas-catalogo-ms`.
+- (Opcional) Tablero de catálogo en tiempo real, con datos correlacionados contra el tablero de infraestructura.
+- (Opcional) Los dos tableros y las alertas provisionados como código, reproducibles sin pasos manuales en la UI.
+- (Opcional) `consolas-gateway` operativo también en producción local, como único componente con puerto de negocio expuesto al host.
+
+## 4. Crea: actividad autónoma
+
+Tiempo: 3h fuera del aula.
+
+### 4.1 Actividad
+
+Extensión autónoma del punto único de acceso a `consolas-orden-ms`, documentada en evidencia individual.
+
+Si `consolas-orden-ms` todavía no tiene Config Client ni Eureka Client (trabajo autónomo de S3), complétalo primero — sin registro, no hay nada que el Gateway pueda resolver por `lb://`.
+
+Completa y evidencia estas tareas:
+
+1. Confirmar que `consolas-orden-ms` se registra en `consolas-eureka` (si no lo hiciste en S3, complétalo ahora: mismo patrón de S3, 4.1).
+2. Agregar una nueva ruta en `consolas-gateway-dev.yml`/`consolas-gateway-prod.yml` (`config-repo`) hacia `consolas-orden-ms`, con su propio `id` y `predicates: Path` correcto para su recurso REST.
+3. Probar la ruta nueva a través del Gateway (`18080`), sin usar el puerto directo de `consolas-orden-ms`.
+4. Levantar una segunda instancia de `consolas-orden-ms` (mismo mecanismo de S3, 4.1) y repetir la prueba de balanceo de carga (3.6) contra la ruta nueva.
+5. Explicar, con tus propias palabras, por qué agregar una ruta nueva no requiere ningún cambio en `consolas-catalogo-ms` ni en sus rutas existentes.
+
+### 4.2 Propósito
+
+Que cada estudiante demuestre, de forma individual y fuera del aula, que puede extender el punto único de acceso a un servicio nuevo sin el acompañamiento del docente.
+
+Esta actividad autónoma se desarrolla sobre el proyecto de fin de curso del equipo. El producto de la unidad se construye por acumulación de los avances de cada sesión; por eso, la evidencia de esta sesión debe incorporarse a la documentación del proyecto y quedar trazable en GitHub.
+
+### 4.3 Indicaciones
+
+Entrega un PDF con el siguiente nombre:
+
+```text
+S04_Equipo##_ApellidoNombre.pdf
+```
+
+Cada captura de pantalla del informe debe mostrar, sin recortar, el reloj del sistema (fecha y hora) y tu usuario o foto de perfil (Windows, VS Code o navegador) visibles en pantalla — es lo que permite verificar que la evidencia es tuya y que corresponde al momento real de tu trabajo.
+
+#### 4.3.1 Estructura del informe
+
+**Datos del estudiante**
+
+- Nombre:
+- Equipo:
+- Sesión: S04 - Punto Único de Acceso y Distribución de Tráfico
+- Rol o aporte realizado:
+- Link de GitHub:
+
+**Evidencia técnica**
+
+Incluye capturas o extractos con una breve explicación debajo de cada uno, organizados en los mismos 4 bloques de la rúbrica (4.6):
+
+1. *`consolas-gateway` operativo*
+    - Captura del dashboard con `consolas-gateway` registrado (trabajo de clase).
+2. *Rutas hacia `consolas-catalogo-ms`*
+    - Peticiones exitosas a `/api/v1/categorias` y `/api/v1/productos` vía el puerto del Gateway (trabajo de clase).
+3. *Ruta nueva hacia `consolas-orden-ms`*
+    - Ruta agregada en `config-repo`, con petición exitosa vía Gateway.
+4. *Balanceo de carga verificado*
+    - Evidencia de peticiones consecutivas resueltas por instancias distintas, tanto en `consolas-catalogo-ms` como en `consolas-orden-ms`.
+
+**Error o hallazgo**
+
+Describe un error real: una ruta que respondió `404` por un `Path` mal escrito, una instancia que nunca recibió tráfico, o un servicio que el Gateway no pudo resolver por no estar registrado.
+
+**Reflexión técnica breve**
+
+Responde en 5 a 8 líneas:
+
+```text
+¿Por qué agregar un microservicio nuevo al sistema no debería exigir que
+los clientes existentes cambien nada de su configuración?
+```
+
+**Anexo: Feedback de la sesión**
+
+Pega esta página como la última hoja del PDF, con tus respuestas.
+
+1. ¿Cuál es el aprendizaje más importante que te llevas de la clase de hoy?
+2. ¿Qué punto de la clase te resultó más confuso o te dejó con dudas?
+3. ¿Tienes alguna pregunta que te gustaría que sea respondida la siguiente clase?
+4. Sobre tu nivel de comprensión de la clase de hoy, marca una opción:
+    - ¡Entendido! - Lo domino y podría explicarlo.
+    - Más o menos. - Entendí la idea general, pero tengo dudas.
+    - Necesito ayuda. - Me siento perdido/a con este tema.
+5. ¿Cómo puedo ayudarte a comprender mejor el tema?
+6. Pensando en tu participación y esfuerzo en la clase de hoy, ¿cómo te autoevaluarías? Marca una opción:
+    - Muy Comprometido/a: Me esforcé al máximo.
+    - Comprometido/a: Sé que podría haberme esforzado un poco más.
+    - Poco Comprometido/a: Hoy no di mi mejor esfuerzo.
+7. Mi satisfacción con la clase fue... (califica del 1 al 10, donde 1 es insatisfecho y 10 es muy satisfecho).
+
+### 4.4 Criterios mínimos de aceptación
+
+La evidencia individual se considera completa si:
+
+- El archivo respeta el nombre solicitado.
+- `consolas-gateway` responde en DEV, registrado en `consolas-eureka` (evidencia de clase).
+- Al menos una ruta nueva hacia `consolas-orden-ms` está definida en `config-repo` y responde a través del Gateway.
+- Se evidencia balanceo de carga entre al menos dos instancias de `consolas-orden-ms`, o se justifica explícitamente por qué no se logró.
+- Cada captura de la evidencia técnica muestra el reloj del sistema y el usuario/perfil visible, sin recortar.
+- Las fechas y horas de las capturas son coherentes con el historial de commits de su repositorio en GitHub.
+- Incluye un error o hallazgo técnico diagnosticado.
+- Incluye la reflexión técnica breve solicitada.
+- Incluye el Anexo de feedback de la sesión respondido, como última página del PDF.
+
+### 4.5 Preguntas de defensa
+
+1. ¿Por qué `lb://consolas-catalogo-ms` no es una dirección real, y quién la resuelve?
+2. ¿Qué diferencia hay entre un `Path` que no coincide con ninguna ruta y un servicio de destino que está caído? ¿Cómo distingues uno del otro por la respuesta que recibes?
+3. ¿Por qué dos recursos del mismo microservicio (`/api/v1/categorias`, `/api/v1/productos`) necesitan dos rutas distintas, si ambas apuntan al mismo `uri`?
+4. Si detienes una instancia con Ctrl+C, ¿cuánto tiempo pasa hasta que el Gateway deja de enviarle tráfico? ¿Por qué no es instantáneo?
+5. ¿Por qué agregar la ruta de `consolas-orden-ms` (sección 4) no requirió tocar ninguna configuración de `consolas-catalogo-ms`?
+
+### 4.6 Rúbrica de evaluación
+
+**Tabla 7. Rúbrica de evaluación**
+
+| Criterio | Peso (%) | A (20 pts) | B (15 pts) | C (10 pts) | D (5 pts) | Nivel obtenido |
+|---|---:|---|---|---|---|---:|
+| 1. `consolas-gateway` operativo* | 25 | `consolas-gateway` funcional en DEV, registrado en `consolas-eureka` y verificado en el dashboard. | Funcional en DEV, con verificación parcial del dashboard. | Arranca pero sin verificación clara del registro. | No evidencia `consolas-gateway` funcionando. | |
+| 2. Rutas hacia `consolas-catalogo-ms`* | 25 | Ambas rutas (`categorias`, `productos`) responden correctamente vía el puerto del Gateway. | Al menos una ruta responde correctamente. | Rutas definidas pero con errores de resolución. | No evidencia ninguna ruta funcional. | |
+| 3. Ruta nueva y balanceo de carga* | 25 | Ruta hacia `consolas-orden-ms` funcional, con balanceo de carga verificado entre dos instancias. | Ruta funcional, con balanceo verificado parcialmente o sobre una sola instancia. | Ruta definida pero sin verificación clara de balanceo. | No evidencia ruta ni balanceo hacia `consolas-orden-ms`. | |
+| 4. Comprensión del patrón* | 25 | Explicación clara y correcta de por qué el cliente deja de conocer puertos individuales, y de cómo el balanceo elige la instancia (2.2, 2.3). | Explicación correcta con detalles menores. | Explicación superficial o imprecisa. | No explica el patrón. | |
+
+\* Agregado manual.
+
+Nota final = suma de (`Peso` / 100 × `Puntos del nivel obtenido`) = ____ / 20.
+
+Para usar la rúbrica con IA, solicita:
+
+```text
+Evalúa el PDF usando la rúbrica de la sesión.
+Para cada criterio selecciona el nivel obtenido usando la escala A=20, B=15, C=10, D=5 puntos.
+Justifica brevemente cada nivel asignado.
+Verifica que cada captura muestre reloj del sistema y usuario/perfil visible, y que las fechas sean coherentes con el historial de commits de GitHub. Si falta esta evidencia o hay inconsistencias, indícalo explícitamente antes de calificar.
+Calcula la nota final con la fórmula: suma de (Peso/100 × Puntos del nivel obtenido), directamente sobre 20.
+Indica 2 fortalezas y 2 recomendaciones.
+```
+
+## 5. Cierre
+
+Tiempo: 5 min.
+
+**Resumen breve:** hoy el sistema ganó un único punto de entrada — `consolas-gateway` resuelve rutas por nombre lógico contra `consolas-eureka` y reparte tráfico entre instancias con balanceo *round-robin*, sin que el cliente externo conozca nunca un puerto de instancia. Quien prueba a mano ya solo escribe una dirección, siempre la misma, sin importar cuántas instancias existan detrás ni cuál de ellas responda esta vez.
+
+**Dinámica participativa:** en una ronda rápida, cada estudiante comparte en una frase qué vio cambiar en las consolas de `consolas-catalogo-ms` al mandar varias peticiones seguidas por el Gateway.
+
+**Metacognición:** ¿qué parte de la sesión te costó más entender — que el Gateway también es un cliente de Eureka, que `lb://` no es una dirección real, o que el balanceo de carga se ve en los logs de las instancias y no en la respuesta HTTP?
+
+**Proyección:** S5 no agrega funcionalidad nueva: integra registro, descubrimiento, ejecución concurrente, Gateway y balanceo de carga como un solo sistema distribuido base, y evalúa lo construido en S1-S4.
+
+## Bibliografía
+
+- SACAViX. (2026). *API Gateway*. SACAViX System Design — API Gateway. https://systemdesign.sacavix.com/patterns/api-gateway
+- SACAViX. (2026). *Load Balancing*. SACAViX System Design — Load Balancing. https://systemdesign.sacavix.com/patterns/load-balancing
+- VMware Tanzu / Broadcom Inc. (2026). *Spring Cloud Gateway reference documentation*. https://docs.spring.io/spring-cloud-gateway/reference/
+- VMware Tanzu / Broadcom Inc. (2026). *Spring Cloud LoadBalancer reference documentation*. https://docs.spring.io/spring-cloud-commons/reference/spring-cloud-commons/loadbalancer.html
+- VMware Tanzu / Broadcom Inc. (2026). *Spring Cloud 2025.1.2 (aka Oakwood) release notes*. https://spring.io/blog/2026/06/11/spring-cloud-2025-1-2-aka-oakwood-has-been-released/

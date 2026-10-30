@@ -1,0 +1,46 @@
+name: consolas-obs-dev
+
+services:
+  consolas-prometheus:
+    image: prom/prometheus:v3.14.0
+    container_name: consolas-prometheus-dev
+    restart: unless-stopped
+    ports:
+      - "19090:9090"
+    volumes:
+      - ./prometheus/prometheus-dev.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  consolas-loki:
+    image: grafana/loki:3.7.6
+    container_name: consolas-loki-dev
+    restart: unless-stopped
+    ports:
+      - "13100:3100"
+
+  consolas-promtail:
+    image: grafana/promtail:3.6.8
+    container_name: consolas-promtail-dev
+    restart: unless-stopped
+    volumes:
+      - ./promtail/promtail-config-dev.yml:/etc/promtail/config.yml:ro
+      - ../services/consolas-catalogo-ms/logs:/var/log/consolas-catalogo-ms:ro
+      - ../services/consolas-orden-ms/logs:/var/log/consolas-orden-ms:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - consolas-loki
+
+  consolas-grafana:
+    image: grafana/grafana:11.4.0
+    container_name: consolas-grafana-dev
+    restart: unless-stopped
+    ports:
+      - "13000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - consolas-prometheus
+      - consolas-loki

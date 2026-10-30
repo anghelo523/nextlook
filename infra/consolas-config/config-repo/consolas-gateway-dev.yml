@@ -1,0 +1,43 @@
+server:
+  port: 18080
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8085/.well-known/jwks.json
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: consolas-catalogo-categorias
+              uri: lb://consolas-catalogo-ms
+              predicates:
+                - Path=/api/v1/categorias/**
+            - id: consolas-catalogo-productos
+              uri: lb://consolas-catalogo-ms
+              predicates:
+                - Path=/api/v1/productos/**
+            - id: consolas-orden-ordenes
+              uri: lb://consolas-orden-ms
+              predicates:
+                - Path=/api/v1/ordenes/**
+
+eureka:
+  instance:
+    hostname: localhost
+    instance-id: ${spring.application.name}:${server.port}
+  client:
+    service-url:
+      defaultZone: http://localhost:18761/eureka
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always

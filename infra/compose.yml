@@ -1,0 +1,46 @@
+name: consolas-infra-prod
+
+services:
+  consolas-config:
+    build:
+      context: ./consolas-config
+      dockerfile: Dockerfile
+    container_name: consolas-config
+    restart: unless-stopped
+    ports:
+      - "28888:8888"
+    volumes:
+      - ./consolas-config/config-repo:/config-repo
+    environment:
+      SERVER_PORT: 8888
+      SPRING_PROFILES_ACTIVE: native
+      CONFIG_REPO_LOCATION: file:/config-repo
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8888' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks:
+      - consolas-prod-net
+
+  consolas-eureka:
+    build:
+      context: ./consolas-eureka
+      dockerfile: Dockerfile
+    container_name: consolas-eureka
+    restart: unless-stopped
+    ports:
+      - "28761:8761"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      CONFIG_SERVER_URL: http://consolas-config:8888
+    depends_on:
+      consolas-config:
+        condition: service_healthy
+    networks:
+      - consolas-prod-net
+
+networks:
+  consolas-prod-net:
+    name: consolas-prod-net

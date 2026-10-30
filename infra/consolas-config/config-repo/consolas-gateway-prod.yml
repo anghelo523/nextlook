@@ -1,0 +1,37 @@
+server:
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: consolas-catalogo-categorias
+              uri: lb://consolas-catalogo-ms
+              predicates:
+                - Path=/api/v1/categorias/**
+            - id: consolas-catalogo-productos
+              uri: lb://consolas-catalogo-ms
+              predicates:
+                - Path=/api/v1/productos/**
+            - id: consolas-orden-ordenes
+              uri: lb://consolas-orden-ms
+              predicates:
+                - Path=/api/v1/ordenes/**
+
+eureka:
+  instance:
+    instance-id: ${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: http://consolas-eureka:8761/eureka
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: never

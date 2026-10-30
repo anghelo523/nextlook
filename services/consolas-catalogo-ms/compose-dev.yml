@@ -1,0 +1,18 @@
+name: consolas-catalogo-dev
+
+services:
+  postgres-catalogo-dev:
+    image: postgres:16-alpine
+    container_name: consolas-postgres-catalogo-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: consolas_catalogo_db
+      POSTGRES_USER: consolas
+      POSTGRES_PASSWORD: consolas
+    ports:
+      - "15432:5432"
+    volumes:
+      - consolas_catalogo_dev_data:/var/lib/postgresql/data
+
+volumes:
+  consolas_catalogo_dev_data:
