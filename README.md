@@ -19,6 +19,7 @@ Una tienda de ropa donde el cliente inicia sesión, elige prendas por talla y co
 ## Contenido
 
 - [Qué avanzamos](#qué-avanzamos)
+- [Stack tecnológico](#stack-tecnológico)
 - [Estado por componente](#estado-por-componente)
 - [Estructura del repositorio](#estructura-del-repositorio)
 - [Arranque rápido](#arranque-rápido)
@@ -60,6 +61,22 @@ Una tienda de ropa donde el cliente inicia sesión, elige prendas por talla y co
 - Panel de administración de productos y de pagos.
 
 **Extras:** workflow de build en GitHub Actions (`.github/workflows/build.yml`) y un nombre de proyecto Compose único (`nextlook-dev`) para los tres archivos compose.
+
+## Stack tecnológico
+
+| Capa | Tecnología | Uso en NextLook |
+|---|---|---|
+| Backend | Java + Spring Boot | Los 8 microservicios de negocio |
+| Infraestructura Spring Cloud | Config Server, Eureka, Spring Cloud Gateway | Configuración centralizada, descubrimiento y punto de entrada único |
+| Comunicación síncrona | OpenFeign + Resilience4j | Llamadas REST con timeout, reintentos y Circuit Breaker |
+| Comunicación asíncrona | Apache Kafka 4 (KRaft) + Kafka UI | Eventos de la Saga de compra |
+| Seguridad | Keycloak + JWT | Login, roles `CLIENTE` / `ADMIN` y validación en Gateway y servicios |
+| Persistencia | PostgreSQL + Flyway | Una base por microservicio, migraciones versionadas |
+| Observabilidad | Prometheus, Loki, Promtail, Grafana | Métricas, logs centralizados con `traceId` y tablero de diagnóstico |
+| Frontend | Angular 22 (SPA) | Tienda, bolsa, pago, «Mis pedidos» y panel de administración |
+| Contenedores | Docker Compose | Levantar todo el entorno en local |
+| CI | GitHub Actions | Build automático (`.github/workflows/build.yml`) |
+| Documentación | MkDocs Material | Sitio de documentación en `NextLook/docs/` |
 
 ---
 
