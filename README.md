@@ -22,6 +22,7 @@ Una tienda de ropa donde el cliente inicia sesión, elige prendas por talla y co
 - [Stack tecnológico](#stack-tecnológico)
 - [Estado por componente](#estado-por-componente)
 - [Estructura del repositorio](#estructura-del-repositorio)
+- [Requisitos previos](#requisitos-previos)
 - [Arranque rápido](#arranque-rápido)
 - [Scripts de demo y verificación](#scripts-de-demo-y-verificación)
 - [Arquitectura](#arquitectura)
@@ -118,6 +119,22 @@ NextLook/
 ```
 
 Cada carpeta principal tiene su propio `README.md` con el detalle de qué contiene y cómo se usa.
+
+## Requisitos previos
+
+| Herramienta | Para qué |
+|---|---|
+| [Docker Desktop](https://www.docker.com/products/docker-desktop/) (o Docker Engine + Compose v2) | Levantar infraestructura, bases de datos y microservicios |
+| [Node.js](https://nodejs.org/) LTS y npm | Generar y ejecutar la SPA Angular |
+| [PowerShell 7](https://learn.microsoft.com/powershell/scripting/install/installing-powershell) (`pwsh`) | Script del frontend y scripts de demo / verificación |
+| Git | Clonar el repositorio |
+
+> El stack completo levanta muchos contenedores (8 microservicios, 8 bases Postgres, Kafka, Keycloak y observabilidad). Asigna a Docker toda la memoria que puedas; con poca RAM los servicios tardan en quedar `UP` o se reinician.
+
+```bash
+git clone https://github.com/anghelo523/nextlook.git
+cd nextlook/NextLook
+```
 
 ---
 
