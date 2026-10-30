@@ -187,6 +187,18 @@ docker run --rm -it -p 8000:8000 -v "${PWD}:/docs" squidfunk/mkdocs-material
 
 Abre http://localhost:8000.
 
+### Detener el entorno
+
+```bash
+# Detener los contenedores (los datos se conservan)
+docker compose -f docker/docker-compose.infra.yml -f services/compose-dev.yml -f obs/compose-dev.yml down
+
+# Detener y borrar también los volúmenes (bases de datos vuelven a los datos semilla)
+docker compose -f docker/docker-compose.infra.yml -f services/compose-dev.yml -f obs/compose-dev.yml down -v
+```
+
+Para ver los logs de un servicio: `docker compose -f docker/docker-compose.infra.yml -f services/compose-dev.yml -f obs/compose-dev.yml logs -f <servicio>`.
+
 ---
 
 ## Scripts de demo y verificación
