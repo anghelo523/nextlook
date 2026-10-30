@@ -1,5 +1,13 @@
 # NextLook
 
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-microservicios-6DB33F?logo=springboot&logoColor=white)
+![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)
+![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-4%20(KRaft)-231F20?logo=apachekafka&logoColor=white)
+![Keycloak](https://img.shields.io/badge/Keycloak-JWT%20%2F%20PKCE-4D4D4D?logo=keycloak&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-una%20base%20por%20servicio-4169E1?logo=postgresql&logoColor=white)
+![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-Prometheus%20%2B%20Loki-F46800?logo=grafana&logoColor=white)
+
 E-commerce de moda basado en **microservicios** — Proyecto Sello del curso de Sistemas Distribuidos.
 
 Una tienda de ropa donde el cliente inicia sesión, elige prendas por talla y color, las paga con Tarjeta, Yape o Plin y sigue su pedido en «Mis pedidos». Por detrás, 8 microservicios Spring Boot se comunican por REST (con resiliencia) y por eventos Kafka (Saga coreografiada), protegidos con Keycloak y observados con Prometheus, Loki y Grafana.
