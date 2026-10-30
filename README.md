@@ -31,6 +31,7 @@ Una tienda de ropa donde el cliente inicia sesión, elige prendas por talla y co
 - [Modelo de datos](#modelo-de-datos)
 - [Roadmap](#roadmap)
 - [Límites conocidos](#límites-conocidos)
+- [Cómo contribuir](#cómo-contribuir)
 - [Equipo](#equipo)
 
 ---
@@ -439,6 +440,16 @@ flowchart TD
 ### Trabajo en otras ramas
 
 - **`avance-emer`** (Johan): avance de S07 sobre la plantilla del curso, con un `auth-ms` propio (login y registro de usuarios con JWT RS256, JWKS y el Gateway como Resource Server). Todavía no está integrado en `main`.
+
+## Cómo contribuir
+
+1. Crea una rama desde `main` con un nombre descriptivo, por ejemplo `feature/pago-mercadopago` o `fix/orden-cancelacion`.
+2. Haz commits pequeños con mensajes claros (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`).
+3. Antes de subir, verifica que el build pase en local y, si tocas la Saga, la seguridad o la resiliencia, corre el script de `scripts/` correspondiente.
+4. Abre un Pull Request hacia `main` y espera que el workflow de GitHub Actions termine en verde.
+5. Si cambias el comportamiento de un microservicio, actualiza su ficha en `NextLook/docs/` y este README.
+
+> No subas credenciales reales ni archivos `.env` con secretos: los usuarios y claves de este README son solo para el entorno local de desarrollo.
 
 ---
 
