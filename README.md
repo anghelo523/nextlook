@@ -25,6 +25,7 @@ Una tienda de ropa donde el cliente inicia sesión, elige prendas por talla y co
 - [Requisitos previos](#requisitos-previos)
 - [Arranque rápido](#arranque-rápido)
 - [Scripts de demo y verificación](#scripts-de-demo-y-verificación)
+- [Solución de problemas](#solución-de-problemas)
 - [Arquitectura](#arquitectura)
 - [Saga de compra](#saga-de-compra)
 - [Modelo de datos](#modelo-de-datos)
@@ -214,6 +215,18 @@ Todos en `NextLook/scripts/` (PowerShell 5+ o 7), con el stack levantado:
 | `simular-falla.ps1` | Caída de `inventario-ms`: la orden espera en Kafka y se completa sola; seguimiento por `traceId` en Grafana. |
 | `readiness-sin-base.ps1` | Readiness cae a `DOWN` cuando el servicio pierde su base de datos. |
 | `verificar-s11.ps1` | Verificación del cliente frontend (PKCE, CORS, token con `talla_preferida`). |
+
+## Solución de problemas
+
+| Síntoma | Qué revisar |
+|---|---|
+| Un microservicio se reinicia o no aparece en Eureka | Depende de Config Server, Eureka, su base y Kafka. Espera a que estos estén `UP` y revisa sus logs con `docker compose ... logs -f <servicio>`. |
+| `port is already allocated` al levantar | Otro programa usa ese puerto (por ejemplo un Postgres local en 5432 u otra app en 8080). Ciérralo o cambia el mapeo en el compose. |
+| Todas las llamadas devuelven **401** | El token venció o no se obtuvo de `http://localhost:18443` (realm `nextlook`). Vuelve a iniciar sesión desde la SPA. |
+| Llamadas devuelven **403** | El usuario no tiene el rol requerido: las rutas de administración necesitan `ADMIN`. |
+| Error de **CORS** en la SPA | Abre la tienda en `http://localhost:4200` y consume la API solo por el Gateway (`:18080`), no por los puertos de cada servicio. |
+| La orden se queda en `PENDIENTE_STOCK` / `PENDIENTE_PAGO` | Revisa en Kafka UI (`:18085`) que los eventos lleguen a los topics y que `inventario-ms` / `pago-ms` estén arriba; al volver procesan lo pendiente. |
+| No aparecen logs en Grafana | Verifica que Loki y Promtail estén corriendo y busca por `traceId` en el tablero *NextLook - Diagnostico*. |
 
 ---
 
