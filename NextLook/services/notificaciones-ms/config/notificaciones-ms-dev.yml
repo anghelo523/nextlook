@@ -1,9 +1,12 @@
-# Placeholder - notificaciones-ms todavia no esta implementado (ver Fase 2 del plan de construccion).
-# Datasource, puerto y Eureka ya estan fijados segun el esquema de puertos acordado.
 server:
   port: 8088
 
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:18443/realms/nextlook/protocol/openid-connect/certs
   datasource:
     url: jdbc:postgresql://localhost:15439/notificaciones_db
     username: nextlook

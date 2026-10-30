@@ -16,8 +16,21 @@ Perfiles de compradores y direcciones de envío. Es consultado de forma síncron
 
 ## Endpoints
 
-<!-- TODO: completar cuando el servicio esté implementado -->
+La identidad sale del JWT (`sub` = `keycloak_id`); el cliente nunca envía su propio id.
+
+| Método | Ruta | Rol | Descripción |
+|---|---|---|---|
+| POST | `/api/v1/clientes` | `CLIENTE` | Registra **su** perfil (nombres, apellidos, DNI, celular). Email tomado del token. |
+| GET | `/api/v1/clientes/me` | `CLIENTE` | Su perfil + dirección principal — **lo consume `orden-ms` por Feign** reenviando el JWT. |
+| PUT | `/api/v1/clientes/me` | `CLIENTE` | Actualiza su perfil. |
+| GET | `/api/v1/clientes/me/direcciones` | `CLIENTE` | Sus direcciones de envío. |
+| POST | `/api/v1/clientes/me/direcciones` | `CLIENTE` | Agrega dirección; la primera queda como principal. |
+| GET | `/api/v1/clientes` | `ADMIN` | Lista todos los clientes. |
+| GET | `/api/v1/clientes/{id}` | `ADMIN` | Detalle de un cliente. |
 
 ## Entidades
 
-<!-- TODO: completar cuando el servicio esté implementado -->
+| Tabla | Campos clave |
+|---|---|
+| `clientes` | `id`, `keycloak_id` (único), `nombres`, `apellidos`, `email` (único), `dni` (único), `telefono`, `fecha_registro` |
+| `direcciones` | `id`, `id_cliente`, `alias`, `direccion`, `distrito`, `ciudad`, `referencia`, `principal` |

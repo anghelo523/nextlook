@@ -1,0 +1,179 @@
+/* NextLook - sistema visual: urbano y editorial. Negro tinta + hueso + un acento naranja senal. */
+:root {
+  --tinta: #0e0e0e;
+  --tinta-2: #1c1c1c;
+  --hueso: #f3f0e8;
+  --papel: #fbfaf6;
+  --blanco: #ffffff;
+  --suave: #6d6a63;
+  --linea: #e3dfd4;
+  --linea-fuerte: #cfc9bb;
+  --acento: #ff5a1f;
+  --acento-hover: #e64a12;
+  --acento-claro: #ffe7dc;
+
+  --ok: #1d7a46;
+  --ok-claro: #e2f3e8;
+  --mal: #c0262d;
+  --mal-claro: #fbe4e4;
+  --espera: #a15c00;
+  --espera-claro: #fdf0d9;
+
+  --display: 'Anton', 'Impact', 'Arial Narrow', sans-serif;
+  --texto: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --serif: 'Instrument Serif', Georgia, serif;
+
+  --radio: 4px;
+  --radio-lg: 10px;
+  --sombra: 0 1px 2px rgb(14 14 14 / 6%), 0 8px 24px rgb(14 14 14 / 6%);
+  --sombra-alta: 0 24px 60px rgb(14 14 14 / 22%);
+  --ancho: 1240px;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: var(--texto);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--tinta);
+  background: var(--papel);
+  -webkit-font-smoothing: antialiased;
+}
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+::selection { background: var(--acento); color: white; }
+
+/* ---------- tipografia ---------- */
+h1, h2, h3, .display {
+  font-family: var(--display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.02;
+  text-transform: uppercase;
+  margin: 0;
+}
+h1 { font-size: clamp(2.6rem, 7vw, 5.6rem); }
+h2 { font-size: clamp(2rem, 4.2vw, 3.2rem); }
+h3 { font-size: 1.35rem; }
+.serif { font-family: var(--serif); font-style: italic; text-transform: none; font-weight: 400; letter-spacing: 0; }
+.eyebrow {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--suave);
+}
+.muted { color: var(--suave); }
+.mono { font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: 0.82rem; }
+
+/* ---------- contenedor de pagina ---------- */
+.pagina { width: 100%; max-width: var(--ancho); margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+.cabecera-pagina {
+  display: flex; align-items: end; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  padding-bottom: 1.4rem; margin-bottom: 1.8rem; border-bottom: 2px solid var(--tinta);
+}
+.cabecera-pagina p { margin: 0.4rem 0 0; color: var(--suave); }
+
+/* ---------- botones ---------- */
+button, .btn {
+  font: inherit; font-size: 0.82rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  min-height: 44px; padding: 0 1.4rem;
+  border: 1.5px solid var(--tinta); border-radius: var(--radio);
+  background: var(--tinta); color: var(--blanco);
+  cursor: pointer; text-decoration: none; white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.15s;
+}
+button:hover, .btn:hover { background: var(--tinta-2); }
+button:active, .btn:active { transform: translateY(1px); }
+button:focus-visible, .btn:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--acento); outline-offset: 2px;
+}
+button.acento, .btn.acento { background: var(--acento); border-color: var(--acento); }
+button.acento:hover, .btn.acento:hover { background: var(--acento-hover); border-color: var(--acento-hover); }
+button.secundario, .btn.secundario { background: transparent; color: var(--tinta); }
+button.secundario:hover, .btn.secundario:hover { background: var(--tinta); color: var(--blanco); }
+button.claro, .btn.claro { background: var(--blanco); color: var(--tinta); border-color: var(--blanco); }
+button.claro:hover, .btn.claro:hover { background: var(--hueso); }
+button.peligro, .btn.peligro { background: transparent; color: var(--mal); border-color: var(--mal); }
+button.peligro:hover, .btn.peligro:hover { background: var(--mal); color: white; }
+button.texto, .btn.texto {
+  background: none; border-color: transparent; color: var(--tinta); padding: 0 0.4rem; min-height: 36px;
+  text-decoration: underline; text-underline-offset: 4px;
+}
+button.texto:hover { color: var(--acento); background: none; }
+button.chico, .btn.chico { min-height: 34px; padding: 0 0.9rem; font-size: 0.72rem; }
+button.ancho, .btn.ancho { width: 100%; }
+button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+/* ---------- formularios ---------- */
+label.campo { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em; }
+label.campo small { font-weight: 400; color: var(--suave); letter-spacing: 0; }
+input, select, textarea {
+  font: inherit; font-size: 0.95rem; width: 100%;
+  min-height: 46px; padding: 0.6rem 0.85rem;
+  border: 1.5px solid var(--linea-fuerte); border-radius: var(--radio);
+  background: var(--blanco); color: var(--tinta);
+  transition: border-color 0.15s;
+}
+textarea { min-height: 90px; resize: vertical; }
+input:hover, select:hover, textarea:hover { border-color: var(--suave); }
+input:focus, select:focus, textarea:focus { border-color: var(--tinta); outline: none; }
+input.ng-invalid.ng-touched { border-color: var(--mal); }
+.rejilla-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; }
+
+/* ---------- tarjetas, avisos y chips ---------- */
+.panel { background: var(--blanco); border: 1px solid var(--linea); border-radius: var(--radio-lg); padding: 1.5rem; }
+.error { color: var(--mal); }
+.aviso {
+  display: flex; gap: 0.75rem; align-items: flex-start;
+  padding: 0.9rem 1.1rem; border-radius: var(--radio); background: var(--espera-claro); color: #5c3600;
+  border-left: 3px solid var(--espera);
+}
+.aviso.mal { background: var(--mal-claro); color: #6d1216; border-left-color: var(--mal); }
+.aviso.ok { background: var(--ok-claro); color: #0f4628; border-left-color: var(--ok); }
+.aviso.info { background: var(--hueso); color: var(--tinta); border-left-color: var(--tinta); }
+.chip {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.28rem 0.7rem; border-radius: 999px;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.chip.ok { background: var(--ok-claro); color: var(--ok); }
+.chip.mal { background: var(--mal-claro); color: var(--mal); }
+.chip.espera { background: var(--espera-claro); color: var(--espera); }
+.chip.neutro { background: var(--hueso); color: var(--tinta); }
+.chip.oscuro { background: var(--tinta); color: var(--blanco); }
+
+/* ---------- tablas ---------- */
+table { width: 100%; border-collapse: collapse; background: var(--blanco); font-size: 0.9rem; }
+th, td { text-align: left; padding: 0.85rem 0.9rem; border-bottom: 1px solid var(--linea); vertical-align: middle; }
+th { font-size: 0.7rem; color: var(--suave); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; background: var(--papel); }
+tbody tr:hover { background: #fcfbf8; }
+.tabla-scroll { overflow-x: auto; border: 1px solid var(--linea); border-radius: var(--radio-lg); }
+.tabla-scroll table { min-width: 720px; }
+
+/* ---------- utilidades ---------- */
+.giro {
+  display: inline-block; width: 0.85rem; height: 0.85rem;
+  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: girar 0.8s linear infinite;
+}
+@keyframes girar { to { transform: rotate(360deg); } }
+@keyframes aparecer { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.aparece { animation: aparecer 0.35s ease-out both; }
+.visualmente-oculto { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- dialogo modal (confirmaciones) ---------- */
+.velo {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 1rem;
+  background: rgb(14 14 14 / 55%); backdrop-filter: blur(3px); animation: aparecer 0.2s ease-out;
+}
+.dialogo {
+  width: min(540px, 100%); background: var(--blanco); border-radius: var(--radio-lg); padding: 1.8rem;
+  box-shadow: var(--sombra-alta);
+}
+.dialogo h3 { font-size: 1.6rem; margin-bottom: 0.6rem; }
+.dialogo p { margin: 0 0 1.4rem; color: var(--suave); }
+.dialogo .acciones { display: flex; gap: 0.6rem; justify-content: flex-end; flex-wrap: wrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

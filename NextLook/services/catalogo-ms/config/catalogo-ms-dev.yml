@@ -1,14 +1,20 @@
-# Placeholder - catalogo-ms todavia no esta implementado (ver Fase 1 del plan de construccion).
-# Datasource, puerto y Eureka ya estan fijados segun el esquema de puertos acordado.
 server:
   port: 8081
 
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:18443/realms/nextlook/protocol/openid-connect/certs
   datasource:
     url: jdbc:postgresql://localhost:15432/catalogo_db
     username: nextlook
     password: nextlook
     driver-class-name: org.postgresql.Driver
+    # S10: si la base no responde, el chequeo 'db' de readiness falla en 3 s (no en los 30 s por defecto)
+    hikari:
+      connection-timeout: 3000
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -40,3 +46,15 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:18761/eureka
+
+# S10 - liveness (el proceso vive) y readiness (puede atender: su base responde)
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState, db

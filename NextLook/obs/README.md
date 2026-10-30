@@ -17,8 +17,15 @@ obs/
 - **Promtail** lee los logs de los contenedores Docker y los envía a Loki, que Grafana usa como datasource de logs.
 - **overrides** guarda archivos (ej. `docker-compose.override.yml`, variables por entorno) que se aplican encima de la infraestructura base sin modificarla directamente — útil para diferencias puntuales entre máquinas o entornos.
 
-## Estado actual
+## Estado actual (S10)
 
-**Prometheus** ya está implementado y corriendo (ver [compose-dev.yml](compose-dev.yml) y [prometheus/](prometheus)): descubre automáticamente los 8 microservicios vía Eureka y scrapea también Config Server, Eureka y Gateway. Dashboard: http://localhost:19090/targets
+Todo implementado en [compose-dev.yml](compose-dev.yml):
 
-**Grafana, Promtail y Loki** siguen pendientes — el datasource de Grafana ya está preparado en [grafana/](grafana) para cuando se agreguen.
+| Pieza | URL | Config |
+|---|---|---|
+| Prometheus | http://localhost:19090/targets | [prometheus/prometheus-dev.yml](prometheus/prometheus-dev.yml): microservicios por Eureka, infra y Keycloak por target estático |
+| Loki | http://localhost:13100/ready | configuración por defecto de la imagen |
+| Promtail | — | [promtail/promtail-config-dev.yml](promtail/promtail-config-dev.yml): consola de los contenedores + `logs/*.log` de lo que corre con Maven |
+| Grafana | http://localhost:13000 (admin/admin) | datasources y tablero provisionados en [grafana/](grafana) |
+
+Detalle en [docs/observabilidad.md](../docs/observabilidad.md).

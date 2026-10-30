@@ -5,6 +5,12 @@ server:
 # Los recursos exactos se ajustaran cuando cada microservicio defina su contrato REST final
 # (ver docs/microservicios/*.md, seccion "Endpoints", todavia con TODO).
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # S07: claves publicas del realm nextlook en Keycloak
+          jwk-set-uri: http://localhost:18443/realms/nextlook/protocol/openid-connect/certs
   cloud:
     gateway:
       server:
@@ -54,3 +60,15 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:18761/eureka
+
+# S10 - grupos liveness / readiness (el Gateway no tiene base propia)
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+# S11 - origenes que pueden llamar al Gateway desde el navegador (la SPA Angular)
+nextlook:
+  cors:
+    allowed-origins: http://localhost:4200

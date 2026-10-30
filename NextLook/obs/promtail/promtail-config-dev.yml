@@ -1,0 +1,98 @@
+# S10 - Promtail de DESARROLLO. Dos caminos, segun como corra cada pieza:
+#  1) Contenedores de la red nextlook-dev-net (microservicios con compose-dev, Gateway, Keycloak,
+#     Kafka...): Promtail lee su salida de consola por la API de Docker. label application = nombre
+#     del contenedor (orden-ms, nextlook-gateway, nextlook-keycloak...).
+#  2) Microservicios corridos con "mvn spring-boot:run" en la PC: Promtail lee services/<ms>/logs/<ms>.log
+#     (logback-spring.xml). Un servicio corre de una forma o de la otra, nunca las dos a la vez.
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://nextlook-loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: nextlook-contenedores
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: network
+            values: [nextlook-dev-net]
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: "/(.*)"
+        target_label: application
+      - target_label: origen
+        replacement: docker
+      # Promtail, Loki y Grafana no se vigilan a si mismos (solo meten ruido)
+      - source_labels: [application]
+        regex: "nextlook-(promtail|loki|grafana)"
+        action: drop
+
+  - job_name: archivo-nextlook-gateway
+    static_configs:
+      - targets: [localhost]
+        labels:
+          application: nextlook-gateway
+          origen: archivo
+          __path__: /var/log/nextlook/infra/nextlook-gateway/logs/nextlook-gateway.log
+  - job_name: archivo-catalogo-ms
+    static_configs:
+      - targets: [localhost]
+        labels:
+          application: catalogo-ms
+          origen: archivo
+          __path__: /var/log/nextlook/services/catalogo-ms/logs/catalogo-ms.log
+  - job_name: archivo-inventario-ms
+    static_configs:
+      - targets: [localhost]
+        labels:
+          application: inventario-ms
+          origen: archivo
+          __path__: /var/log/nextlook/services/inventario-ms/logs/inventario-ms.log
+  - job_name: archivo-resenas-ms
+    static_configs:
+      - targets: [localhost]
+        labels:
+          application: resenas-ms
+          origen: archivo
+          __path__: /var/log/nextlook/services/resenas-ms/logs/resenas-ms.log
+  - job_name: archivo-orden-ms
+    static_configs:
+      - targets: [localhost]
+        labels:
+          application: orden-ms
+          origen: archivo
+          __path__: /var/log/nextlook/services/orden-ms/logs/orden-ms.log
+  - job_name: archivo-pago-ms
+    static_configs:
+      - targets: [localhost]
+        labels:
+          application: pago-ms
+          origen: archivo
+          __path__: /var/log/nextlook/services/pago-ms/logs/pago-ms.log
+  - job_name: archivo-cliente-ms
+    static_configs:
+      - targets: [localhost]
+        labels:
+          application: cliente-ms
+          origen: archivo
+          __path__: /var/log/nextlook/services/cliente-ms/logs/cliente-ms.log
+  - job_name: archivo-envio-ms
+    static_configs:
+      - targets: [localhost]
+        labels:
+          application: envio-ms
+          origen: archivo
+          __path__: /var/log/nextlook/services/envio-ms/logs/envio-ms.log
+  - job_name: archivo-notificaciones-ms
+    static_configs:
+      - targets: [localhost]
+        labels:
+          application: notificaciones-ms
+          origen: archivo
+          __path__: /var/log/nextlook/services/notificaciones-ms/logs/notificaciones-ms.log

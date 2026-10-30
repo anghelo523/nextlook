@@ -11,15 +11,31 @@ scrape_configs:
     relabel_configs:
       - source_labels: [__meta_eureka_app_name]
         target_label: application
+      # S10: Eureka entrega el nombre en MAYUSCULAS (ORDEN-MS); Loki lo tiene en minusculas
+      # (orden-ms). Se normaliza para que un mismo filtro sirva en metricas y en logs.
+      - source_labels: [application]
+        action: lowercase
+        target_label: application
 
-  # Config Server, Eureka y Gateway no se registran a si mismos en Eureka, asi que se
-  # scrapean por direccion fija (nombre del contenedor en la red de Docker).
+  # Config Server, Eureka y Gateway: direccion fija (nombre del contenedor en la red de Docker).
   - job_name: "nextlook-infra"
     metrics_path: "/actuator/prometheus"
     static_configs:
-      - targets:
-          - "nextlook-config:18888"
-          - "nextlook-eureka:18761"
-          - "nextlook-gateway:18080"
+      - targets: ["nextlook-config:18888"]
         labels:
-          application: infra
+          application: nextlook-config
+      - targets: ["nextlook-eureka:18761"]
+        labels:
+          application: nextlook-eureka
+      - targets: ["nextlook-gateway:18080"]
+        labels:
+          application: nextlook-gateway
+
+  # S10: Keycloak no es cliente de Eureka -> target estatico, en su puerto de management (9000)
+  # y con su propia ruta (/metrics, no /actuator/prometheus: no es Spring Boot).
+  - job_name: "nextlook-keycloak"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["nextlook-keycloak:9000"]
+        labels:
+          application: nextlook-keycloak

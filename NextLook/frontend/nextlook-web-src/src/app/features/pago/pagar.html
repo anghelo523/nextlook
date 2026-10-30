@@ -1,0 +1,287 @@
+<div class="pagina">
+  <div class="distribucion">
+    <!-- ================= columna principal ================= -->
+    <section class="principal">
+      @switch (fase()) {
+        @case ('cargando') {
+          <div class="estado"><span class="giro grande"></span><p>Cargando tu pedido…</p></div>
+        }
+
+        @case ('preparando') {
+          <div class="estado aparece">
+            <span class="giro grande"></span>
+            <h2>Separando tus prendas</h2>
+            <p class="muted">Estamos reservando cada talla en almacen. En unos segundos podras elegir como pagar.</p>
+            @if (tardando()) {
+              <p class="aviso">Esta tardando mas de lo normal. Tu pedido no se perdio: seguimos consultando.</p>
+            }
+          </div>
+        }
+
+        @case ('elegir') {
+          <header class="cabecera-pagina">
+            <div>
+              <p class="eyebrow">Paso 2 de 2 · Pedido #{{ orden()?.id }}</p>
+              <h1 class="titulo">¿Como quieres <span class="serif">pagar?</span></h1>
+            </div>
+          </header>
+          @if (error()) { <p class="aviso mal">{{ error() }}</p> }
+          <div class="metodos">
+            @for (m of metodos; track m.id) {
+              <button type="button" class="metodo" [attr.data-metodo]="m.id" (click)="elegir(m)">
+                <span class="metodo-icono"><app-icono [nombre]="m.icono" [tam]="28" /></span>
+                <span class="metodo-texto">
+                  <strong>{{ m.nombre }}</strong>
+                  <small>{{ m.bajada }}</small>
+                </span>
+                <app-icono nombre="flecha" [tam]="20" />
+              </button>
+            }
+            <button type="button" class="metodo desistir" (click)="preguntarCancelar.set(true)">
+              <span class="metodo-icono"><app-icono nombre="x_circulo" [tam]="28" /></span>
+              <span class="metodo-texto">
+                <strong>Ya no quiero este pedido</strong>
+                <small>Lo cancelamos y liberamos tus prendas. No se te cobra nada.</small>
+              </span>
+              <app-icono nombre="flecha" [tam]="20" />
+            </button>
+          </div>
+        }
+
+        @case ('pasos') {
+          @if (metodo(); as m) {
+            <header class="cabecera-pasos">
+              <button type="button" class="texto" (click)="atras()"><app-icono nombre="atras" [tam]="18" /> Atras</button>
+              <p class="eyebrow">Pagar con {{ m.nombre }}</p>
+            </header>
+
+            <ol class="stepper" [attr.data-metodo]="m.id">
+              @for (p of pasosVisibles(); track p; let i = $index) {
+                <li [class.hecho]="i < paso()" [class.actual]="i === paso()">
+                  <span class="numero">@if (i < paso()) { <app-icono nombre="check" [tam]="14" [grosor]="2.4" /> } @else { {{ i + 1 }} }</span>
+                  <span class="etiqueta">{{ p }}</span>
+                </li>
+              }
+            </ol>
+
+            <div class="paso aparece">
+              <!-- ---------- TARJETA ---------- -->
+              @if (m.id === 'TARJETA' && paso() === 0) {
+                <div class="tarjeta-visual" [attr.data-marca]="marcaTarjeta()">
+                  <div class="chip-tarjeta"></div>
+                  <p class="tv-numero">{{ tarjeta.numero || '•••• •••• •••• ••••' }}</p>
+                  <div class="tv-pie">
+                    <span><small>Titular</small>{{ tarjeta.titular || 'NOMBRE APELLIDO' }}</span>
+                    <span><small>Vence</small>{{ tarjeta.vence || 'MM/AA' }}</span>
+                    <strong>{{ marcaTarjeta() }}</strong>
+                  </div>
+                </div>
+                <form class="rejilla-form" (ngSubmit)="siguiente()">
+                  <label class="campo completo">Numero de tarjeta
+                    <input name="numero" inputmode="numeric" autocomplete="cc-number" placeholder="4111 1111 1111 1111"
+                           [ngModel]="tarjeta.numero" (ngModelChange)="formatearNumero($event)" />
+                  </label>
+                  <label class="campo completo">Nombre del titular
+                    <input name="titular" autocomplete="cc-name" placeholder="Como figura en la tarjeta" [(ngModel)]="tarjeta.titular" />
+                  </label>
+                  <label class="campo">Vencimiento
+                    <input name="vence" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/AA"
+                           [ngModel]="tarjeta.vence" (ngModelChange)="formatearVence($event)" />
+                  </label>
+                  <label class="campo">CVV
+                    <input name="cvv" inputmode="numeric" autocomplete="cc-csc" placeholder="123" maxlength="4" [(ngModel)]="tarjeta.cvv" />
+                  </label>
+                  <button type="submit" class="visualmente-oculto" tabindex="-1">Continuar</button>
+                </form>
+              }
+              @if (m.id === 'TARJETA' && paso() === 1) {
+                <div class="revision">
+                  <h3>Revisa tu pago</h3>
+                  <dl>
+                    <div><dt>Metodo</dt><dd>{{ marcaTarjeta() }} terminada en {{ ultimos4() }}</dd></div>
+                    <div><dt>Titular</dt><dd>{{ tarjeta.titular }}</dd></div>
+                    <div><dt>Envio a</dt><dd>{{ orden()?.direccionEnvio }}</dd></div>
+                    <div class="total"><dt>Total a pagar</dt><dd>{{ soles(orden()?.total) }}</dd></div>
+                  </dl>
+                </div>
+              }
+
+              <!-- ---------- YAPE / PLIN: QR ---------- -->
+              @if ((m.id === 'YAPE' || m.id === 'PLIN') && paso() === 0) {
+                <div class="qr-bloque">
+                  <div class="qr-marco" [attr.data-metodo]="m.id">
+                    <p class="qr-titulo">{{ m.nombre }} a <strong>NextLook</strong></p>
+                    <app-qr-demo [texto]="m.id + '-' + orden()?.id" />
+                    <p class="qr-monto">{{ soles(orden()?.total) }}</p>
+                    <p class="qr-nota">QR de prueba · pasarela simulada</p>
+                  </div>
+                  <ol class="instrucciones">
+                    @if (m.id === 'YAPE') {
+                      <li><span><strong>Abre Yape</strong> en tu celular e inicia sesion.</span></li>
+                      <li><span>Toca <strong>Escanear QR</strong> y apunta a este codigo.</span></li>
+                      <li><span>Verifica que el monto sea <strong>{{ soles(orden()?.total) }}</strong> y que el destino diga NextLook.</span></li>
+                      <li><span>Confirma el yapeo y anota el <strong>codigo de aprobacion</strong> de 6 digitos.</span></li>
+                    } @else {
+                      <li><span><strong>Abre la app de tu banco</strong> (BBVA, Interbank, Scotiabank, BanBif…).</span></li>
+                      <li><span>Entra a <strong>Plin</strong> y elige <strong>Escanear QR</strong>.</span></li>
+                      <li><span>Verifica el monto de <strong>{{ soles(orden()?.total) }}</strong> y que el destino diga NextLook.</span></li>
+                      <li><span>Confirma el pago desde tu banco.</span></li>
+                    }
+                  </ol>
+                </div>
+              }
+
+              <!-- ---------- YAPE / PLIN: confirmacion ---------- -->
+              @if ((m.id === 'YAPE' || m.id === 'PLIN') && paso() === 1) {
+                <form class="rejilla-form" (ngSubmit)="siguiente()">
+                  <label class="campo">Celular con el que pagaste
+                    <input name="celular" inputmode="numeric" autocomplete="tel-national" placeholder="987 654 321" maxlength="11"
+                           [(ngModel)]="billetera.celular" />
+                  </label>
+                  @if (m.id === 'YAPE') {
+                    <label class="campo">Codigo de aprobacion
+                      <input name="codigo" inputmode="numeric" placeholder="6 digitos" maxlength="6" [(ngModel)]="billetera.codigo" />
+                    </label>
+                  }
+                  <label class="campo completo">Nombre del titular de la cuenta
+                    <input name="titular" autocomplete="name" placeholder="Como figura en tu {{ m.nombre }}" [(ngModel)]="billetera.titular" />
+                  </label>
+                  <button type="submit" class="visualmente-oculto" tabindex="-1">Confirmar</button>
+                </form>
+              }
+
+              @if (paso() === pasosVisibles().length - 2) {
+                <p class="aviso info demo">
+                  <app-icono nombre="escudo" [tam]="20" />
+                  <span><strong>Modo de prueba.</strong> El nombre del titular decide el resultado: escribe
+                    <span class="mono">APRO</span> para aprobar o <span class="mono">FUND</span> para simular fondos insuficientes.</span>
+                </p>
+              }
+
+              @if (error()) { <p class="aviso mal">{{ error() }}</p> }
+
+              <div class="acciones-paso">
+                <button type="button" class="secundario" [disabled]="enviando()" (click)="atras()">Atras</button>
+                <button type="button" class="acento" [disabled]="enviando()" (click)="siguiente()">
+                  @if (enviando()) { <span class="giro"></span> Procesando pago… }
+                  @else if (paso() === pasosVisibles().length - 2) { <app-icono nombre="candado" [tam]="16" /> Pagar {{ soles(orden()?.total) }} }
+                  @else if (m.id === 'TARJETA') { Continuar <app-icono nombre="flecha" [tam]="18" /> }
+                  @else { Ya pague, continuar <app-icono nombre="flecha" [tam]="18" /> }
+                </button>
+              </div>
+            </div>
+          }
+        }
+
+        @case ('confirmando') {
+          <div class="estado aparece">
+            <span class="giro grande"></span>
+            <h2>Confirmando tu compra</h2>
+            <p class="muted">
+              @if (pago()?.estado === 'APROBADO') { La pasarela aprobo el pago. Estamos cerrando tu pedido… }
+              @else { Revisando la respuesta de la pasarela… }
+            </p>
+            @if (tardando()) { <p class="aviso">Esta tardando mas de lo normal; seguimos consultando.</p> }
+          </div>
+        }
+
+        @case ('exito') {
+          <div class="final exito aparece">
+            <div class="sello"><app-icono nombre="check" [tam]="46" [grosor]="2.4" /></div>
+            <p class="eyebrow">Pedido #{{ orden()?.id }}</p>
+            <h1 class="titulo">¡Compra <span class="serif">realizada!</span></h1>
+            <p class="muted">Pagaste <strong>{{ soles(orden()?.total) }}</strong> con {{ nombreMetodo(orden()?.metodoPago) }}.
+              Ya estamos preparando tu paquete para enviarlo a <strong>{{ orden()?.direccionEnvio }}</strong>.</p>
+            @if (pago()?.idTransaccion) {
+              <p class="comprobante">Operacion <span class="mono">{{ pago()?.idTransaccion }}</span></p>
+            }
+            <div class="final-acciones">
+              <a routerLink="/mis-pedidos" class="btn">Ver mis pedidos</a>
+              <a routerLink="/catalogo" class="btn secundario">Seguir comprando</a>
+            </div>
+          </div>
+        }
+
+        @case ('rechazado') {
+          <div class="final mal aparece">
+            <div class="sello"><app-icono nombre="x_circulo" [tam]="46" /></div>
+            <h1 class="titulo">Pago <span class="serif">rechazado</span></h1>
+            <p class="muted">{{ pago()?.motivo ?? 'La entidad rechazo el pago.' }} No se realizo ningun cobro y liberamos tus prendas.</p>
+            <div class="final-acciones">
+              <a routerLink="/catalogo" class="btn">Volver al catalogo</a>
+              <a routerLink="/mis-pedidos" class="btn secundario">Mis pedidos</a>
+            </div>
+          </div>
+        }
+
+        @case ('cancelado') {
+          <div class="final aparece">
+            <div class="sello neutro"><app-icono nombre="cerrar" [tam]="40" /></div>
+            <h1 class="titulo">Pedido <span class="serif">cancelado</span></h1>
+            <p class="muted">Cancelamos el pedido #{{ orden()?.id }}. Tus prendas vuelven a estar disponibles y no se te cobro nada.</p>
+            <div class="final-acciones">
+              <a routerLink="/catalogo" class="btn">Volver al catalogo</a>
+            </div>
+          </div>
+        }
+
+        @case ('no-disponible') {
+          <div class="final aparece">
+            <div class="sello neutro"><app-icono nombre="reloj" [tam]="40" /></div>
+            <h2>Este pedido no se puede pagar</h2>
+            <p class="muted">
+              @if (orden()?.estado === 'CARRITO') { {{ orden()?.observacion }} }
+              @else if (orden()?.observacion?.startsWith('SIN_STOCK')) { Una de las tallas se agoto mientras separabamos tu pedido. No se te cobro nada. }
+              @else { {{ error() ?? 'Revisa el estado en Mis pedidos.' }} }
+            </p>
+            <div class="final-acciones">
+              <a routerLink="/mis-pedidos" class="btn">Ir a mis pedidos</a>
+              <a routerLink="/catalogo" class="btn secundario">Catalogo</a>
+            </div>
+          </div>
+        }
+      }
+    </section>
+
+    <!-- ================= resumen del pedido ================= -->
+    @if (orden(); as o) {
+      <aside class="resumen panel">
+        <p class="eyebrow">Pedido #{{ o.id }}</p>
+        <ul>
+          @for (i of o.items; track i.varianteId) {
+            <li>
+              <div class="mini">
+                @if (urlImagen(fotos().get(i.varianteId)); as src) { <img [src]="src" alt="" /> }
+                <span class="cant">{{ i.cantidad }}</span>
+              </div>
+              <div>
+                <p class="n">{{ i.nombrePrenda }}</p>
+                <p class="muted">{{ i.color }} · {{ i.talla === 'UNICA' ? 'Talla unica' : 'Talla ' + i.talla }}</p>
+              </div>
+              <p class="s">{{ soles(i.subtotal) }}</p>
+            </li>
+          }
+        </ul>
+        <dl>
+          <div><dt>Envio</dt><dd>Gratis</dd></div>
+          <div class="total"><dt>Total</dt><dd>{{ soles(o.total) }}</dd></div>
+        </dl>
+        @if (o.direccionEnvio) {
+          <p class="direccion"><app-icono nombre="camion" [tam]="16" /> {{ o.direccionEnvio }}</p>
+        }
+      </aside>
+    }
+  </div>
+</div>
+
+@if (preguntarCancelar()) {
+  <app-confirmar-dialogo
+    titulo="¿Cancelar este pedido?"
+    [texto]="'Vas a cancelar el pedido #' + orden()?.id + ' por ' + soles(orden()?.total) + '. Liberaremos tus prendas y no se te cobrara nada. Esta accion no se puede deshacer.'"
+    textoConfirmar="Si, cancelar pedido"
+    textoCancelar="No, quiero pagar"
+    [peligro]="true"
+    [ocupado]="enviando()"
+    (confirmar)="confirmarCancelacion()"
+    (cancelar)="preguntarCancelar.set(false)" />
+}

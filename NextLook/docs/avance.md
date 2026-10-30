@@ -1,20 +1,25 @@
 # Estado de avance
 
-Foto del proyecto al **2026-09-11**: qué está implementado y corriendo, qué es solo esqueleto, y qué falta. Se actualiza a medida que avanza cada fase del [Roadmap](#roadmap).
+Foto del proyecto al **2026-10-28** (cierre de la Unidad II, S06–S11): qué está implementado y corriendo, qué es solo esqueleto, y qué falta. Se actualiza a medida que avanza cada fase del [Roadmap](#roadmap).
 
 ## Resumen
 
 | Componente | Estado | Detalle |
 |---|---|---|
 | Config Server (`nextlook-config`) | ✅ Implementado | Sirve configuración a todos los demás desde [infra/config-repo](../infra/config-repo) y `services/*/config`. |
-| Eureka (`nextlook-eureka`) | ✅ Implementado | Service Registry, sin lógica propia. |
-| Gateway (`nextlook-gateway`) | ✅ Implementado | Rutas `/api/v1/**` → microservicios, ya con las 9 rutas del [brief](brief.md) definidas por config. |
-| 8 microservicios | 🟡 Esqueleto bootable | Arrancan, se registran en Eureka, exponen `/actuator/health` y `/swagger-ui.html`. **Sin entidades, repositorios ni controladores de negocio todavía** — ver TODOs en [Microservicios](microservicios/orden-ms.md). |
-| Prometheus | ✅ Implementado | Descubre y scrapea los 8 microservicios vía Eureka (`eureka_sd_configs`), más Config/Eureka/Gateway por dirección fija. |
-| Grafana / Loki / Promtail | ⬜ Pendiente | Carpetas y datasource ya preparados en [obs/](../obs), falta levantarlos. |
-| Seguridad (Keycloak / JWT) | ⬜ Pendiente | Keycloak corre en Docker (`docker/docker-compose.infra.yml`), pero ningún microservicio valida JWT todavía — no hay endpoints de negocio que proteger aún (ver [Seguridad](seguridad.md)). |
-| Mensajería asíncrona | ⬜ Sin definir | El brief no especifica Kafka/RabbitMQ/otro (ver [Comunicación](comunicacion.md)); los 8 microservicios ni siquiera tienen la lógica que dispararía esos eventos todavía. |
-| Lógica de negocio | ⬜ Pendiente | Entidades, repositorios, controladores y migraciones Flyway de cada microservicio. |
+| Eureka (`nextlook-eureka`) | ✅ Implementado | Service Registry; `orden-ms` resuelve `cliente-ms` y `catalogo-ms` por nombre. |
+| Gateway (`nextlook-gateway`) | ✅ Implementado | Rutas `/api/v1/**` + **validación JWT y reglas por rol** (1ra línea de defensa, S07). |
+| `catalogo-ms` | ✅ Implementado (U2) | Categorías, prendas, variantes talla/color, datos semilla. |
+| `cliente-ms` | ✅ Implementado (U2) | Perfil ligado al JWT + direcciones de envío. |
+| `orden-ms` | ✅ Implementado (U2) | Feign + Circuit Breaker (S06), evento `orden.creada` (S08), Saga (S09). |
+| `inventario-ms` | ✅ Implementado (U2) | Reserva todo-o-nada idempotente, confirmación y compensación. |
+| `pago-ms` | 🟡 Implementado con pasarela simulada | Flujo de eventos completo; falta conectar Mercado Pago Sandbox real. |
+| `resenas-ms`, `envio-ms`, `notificaciones-ms` | 🟡 Esqueleto protegido | Validan JWT (401/403) igual que el resto; su lógica de negocio queda para U3. |
+| Seguridad (Keycloak / JWT) | ✅ Implementado | Realm `nextlook` importado automáticamente; Gateway + cada servicio implementado validan el token (ver [Seguridad](seguridad.md)). TLS real pendiente. |
+| Mensajería asíncrona | ✅ Kafka 4 (KRaft) | Topics `orden-eventos`, `inventario-eventos`, `pago-eventos` + Kafka UI (ver [Comunicación](comunicacion.md)). |
+| Consistencia distribuida | ✅ Saga coreografiada | Consumidores idempotentes y compensación (ver [Consistencia](consistencia.md)). |
+| Cliente web (S11) | ✅ Implementado | SPA Angular 22 en `frontend/`: login PKCE contra Keycloak, catálogo, bolsa, perfil, «Mis pedidos» con *polling* y pago (ver [Cliente web](frontend.md)). |
+| Observabilidad (S10) | ✅ Implementado | Prometheus (+ Keycloak), Loki/Promtail, Grafana con el tablero *NextLook - Diagnostico*, health groups y `X-Trace-ID` de punta a punta (ver [Observabilidad](observabilidad.md)). |
 
 ## Cómo levantar todo (dev)
 
@@ -26,7 +31,7 @@ docker compose \
   up -d --build
 ```
 
-Levanta: Config Server, Eureka, Gateway, Keycloak, una base Postgres por microservicio, los 8 microservicios y Prometheus (definidos en `docker/docker-compose.infra.yml`, `services/compose-dev.yml` y `obs/compose-dev.yml`).
+Levanta: Config Server, Eureka, Gateway, Keycloak (con el realm `nextlook` ya importado), Kafka + Kafka UI, una base Postgres por microservicio, los 8 microservicios y Prometheus (definidos en `docker/docker-compose.infra.yml`, `services/compose-dev.yml` y `obs/compose-dev.yml`).
 
 | Servicio | URL |
 |---|---|
@@ -34,6 +39,10 @@ Levanta: Config Server, Eureka, Gateway, Keycloak, una base Postgres por microse
 | Eureka | http://localhost:18761 |
 | Config Server | http://localhost:18888 |
 | Prometheus | http://localhost:19090/targets |
+| Grafana | http://localhost:13000 (admin / admin) |
+| SPA (Angular, `npm start`) | http://localhost:4200 |
+| Keycloak | http://localhost:18443 (realm `nextlook`) |
+| Kafka UI | http://localhost:18085 |
 | catalogo-ms | http://localhost:8081 |
 | inventario-ms | http://localhost:8082 |
 | resenas-ms | http://localhost:8083 |
@@ -55,9 +64,9 @@ flowchart TD
     F1["Fase 1 — Núcleo del dominio<br/>catalogo-ms + orden-ms"]
     F2["Fase 2 — Resto de microservicios<br/>cliente, envio, inventario,<br/>notificaciones, pago, resenas"]
     F3["Fase 3 — Seguridad<br/>JWT por microservicio + TLS Keycloak"]
-    F4["Fase 4 (propuesta) — Mensajería asíncrona<br/>elegir Kafka/RabbitMQ/otro + eventos"]
+    F4["Fase 4 — Mensajería asíncrona<br/>Kafka + Saga de compra"]
     F5["Fase 5 — Integración de pago<br/>Mercado Pago Sandbox"]
-    F6["Fase 6 (propuesta) — Observabilidad completa<br/>Grafana + Loki + Promtail"]
+    F6["Fase 6 — Observabilidad completa<br/>Grafana + Loki + Promtail"]
     F7["Fase 7 — Stack completo dockerizado<br/>infra + microservicios + Kafka + observabilidad"]
 
     F0 --> F1 --> F2 --> F3 --> F4 --> F5 --> F6 --> F7
@@ -67,17 +76,20 @@ flowchart TD
     classDef pending fill:#eef0f2,stroke:#8a94a3,stroke-width:2px,color:#333;
     classDef proposed fill:#e6e6fa,stroke:#6a5acd,stroke-width:2px,stroke-dasharray: 4 3,color:#2e2e5c;
 
-    class F0 done;
-    class F1,F2 progress;
-    class F3,F5 pending;
-    class F4,F6 proposed;
+    class F0,F1,F3,F4 done;
+    class F2,F5 progress;
+    class F6 done;
     class F7 pending;
 ```
 
-- 🟢 **Fase 0 — hecha**: es lo que se levantó hoy (este documento).
-- 🟡 **Fases 1-2 — en progreso**: el esqueleto de los 8 microservicios ya existe; falta la lógica de negocio real de cada uno.
-- ⬜ **Fase 3, 5, 7 — pendientes**, confirmadas por el equipo pero sin empezar.
-- 🟣 **Fases 4, 6 — propuestas**, a confirmar.
+- 🟢 **Fases 0, 1, 3 y 4 — hechas**: infraestructura, núcleo (`catalogo-ms` + `orden-ms`), seguridad JWT de dos líneas y mensajería Kafka con la Saga de compra.
+- 🟡 **Fase 2 — en progreso**: `cliente-ms`, `inventario-ms` y `pago-ms` listos; faltan `resenas-ms`, `envio-ms`, `notificaciones-ms`.
+- 🟡 **Fase 5 — en progreso**: `pago-ms` ya cobra y publica eventos, con pasarela simulada; falta la API real de Mercado Pago Sandbox.
+- 🟢 **Fase 6 — hecha (S10)**: Grafana + Loki + Promtail con tablero de diagnóstico. ⬜ **Fase 7 — pendiente**.
+
+## Prueba rápida de la Saga
+
+Con todo levantado: `pwsh scripts/prueba-saga.ps1` (Windows PowerShell 5+ o PowerShell 7). Recorre tres casos: compra pagada (`APRO`), pago rechazado (`FUND`, con compensación de stock) y orden sin stock (zapatillas talla 42 negro, stock 0).
 
 ## Qué falta para que cada fase esté "hecha"
 
